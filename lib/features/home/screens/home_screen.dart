@@ -18,7 +18,7 @@ class HomeScreen extends StatelessWidget {
       body: SafeArea(
         child: Center(
           child: Text(
-            'Hey, where were you?',
+            'Afternoon',
             style: textTheme.titleLarge,
           ),
         ),
