@@ -25,8 +25,7 @@ separate fitness app is planned later.
 - **Framework:** Flutter (targeting Flutter 3.44 / Dart 3.12 — verify
   current versions before assuming these are still latest)
 - **Platforms:** macOS, Windows, Linux, iOS, Android
-- **Storage:** Local-only (no cloud sync). Specific solution (SQLite vs.
-  Hive) not yet decided.
+- **Storage:** Local-only (no cloud sync).
 - **Package ID:** `com.mady.wherewasi`
 
 ## Design Philosophy
@@ -36,45 +35,6 @@ separate fitness app is planned later.
   try to become a general lifestyle tracker.
 - **Finish over explore.** Scope discipline matters; features get added
   deliberately, not speculatively.
-
-## Project Structure
-
-```
-lib/
-  main.dart
-  core/
-    theme/          # Theme definitions (visual identity TBD)
-  shared/
-    widgets/        # Reusable widgets across features
-  features/
-    reading/
-      widgets/
-      models/
-      screens/
-```
-
-## Visual Identity
-
-Not yet designed. Currently using Flutter Material 3 defaults as a
-placeholder so the app compiles and runs. Design direction (color,
-typography, mood) to be decided separately before polishing UI.
-
-## Roadmap
-
-- [ ] Decide local storage solution (SQLite vs. Hive)
-- [ ] Design visual identity
-- [ ] Core reading tracker: add/edit books, track progress
-- [ ] "Where was I?" resume/bookmark feature
-- [ ] Reading stats and history
-- [ ] Light/dark mode support via `Theme.of(context).colorScheme`
-      (avoid hardcoded color constants in widgets)
-
-## Getting Started
-
-```bash
-flutter pub get
-flutter run
-```
 
 ## License
 
