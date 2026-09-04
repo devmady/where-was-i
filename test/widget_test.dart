@@ -6,7 +6,7 @@ void main() {
   testWidgets('app launches on Home with the floating nav bar', (tester) async {
     await tester.pumpWidget(const WhereWasIApp());
 
-    expect(find.text('Hey, where were you?'), findsOneWidget);
+    expect(find.text('Afternoon'), findsOneWidget);
     expect(find.byType(MainNavBar), findsOneWidget);
   });
 }
