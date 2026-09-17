@@ -49,10 +49,12 @@ class AppTheme {
     final colorScheme = ColorScheme.light(
       surface: AppColors.lightBackground,
       onSurface: AppColors.lightTextPrimary,
+      onSurfaceVariant: AppColors.lightTextSecondary,
       primary: AppColors.lightTeal,
       onPrimary: AppColors.lightBackground,
       secondary: AppColors.lightTerracotta,
       onSecondary: AppColors.lightBackground,
+      surfaceContainerHighest: const Color(0xFFF2F1EE),
     );
 
     return ThemeData(
@@ -68,10 +70,12 @@ class AppTheme {
     final colorScheme = ColorScheme.dark(
       surface: AppColors.darkBackground,
       onSurface: AppColors.darkTextPrimary,
+      onSurfaceVariant: AppColors.darkTextSecondary,
       primary: AppColors.darkTeal,
       onPrimary: AppColors.darkBackground,
       secondary: AppColors.darkTerracotta,
       onSecondary: AppColors.darkBackground,
+      surfaceContainerHighest: const Color(0xFF1F2624),
     );
 
     return ThemeData(

@@ -40,10 +40,11 @@ class _AppShellState extends State<AppShell> {
     setState(() => _currentIndex = index);
   }
 
-  void _onHomeLongPress() {
-    // trigger the add-book popup/banner once it exists.
-    // Secondary shortcut — LibraryScreen's own + button is the
-    // primary entry point per the locked nav plan.
+  void _openAddBookSheet() {
+    // open the add-book dialog/banner once it exists (handoff
+    // doc §6, item 3). Shared by both entry points — LibraryScreen's
+    // "+" button (primary) and the Home long-press (secondary
+    // shortcut) — so they never drift into two different flows.
   }
 
   @override
@@ -55,10 +56,10 @@ class _AppShellState extends State<AppShell> {
           PageView(
             controller: _pageController,
             onPageChanged: _onPageChanged,
-            children: const [
-              LibraryScreen(),
-              HomeScreen(),
-              ProfileScreen(),
+            children: [
+              LibraryScreen(onAddBook: _openAddBookSheet),
+              const HomeScreen(),
+              const ProfileScreen(),
             ],
           ),
           Align(
@@ -66,7 +67,7 @@ class _AppShellState extends State<AppShell> {
             child: MainNavBar(
               currentIndex: _currentIndex,
               onTap: _onNavTap,
-              onHomeLongPress: _onHomeLongPress,
+              onHomeLongPress: _openAddBookSheet,
             ),
           ),
         ],
