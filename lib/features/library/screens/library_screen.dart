@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/book.dart';
 import '../widgets/book_card.dart';
 import '../widgets/library_filter_tabs.dart';
+import '../widgets/scroll_wheel_zoom_control.dart';
 
 /// Library screen — left of the Home center, holds the book list.
 /// Primary add-book entry point lives here (top bar "+"), sharing the
@@ -21,8 +23,37 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
+  static const double _minCardSize = 110.0;
+  static const double _maxCardSize = 220.0;
+  static const double _defaultCardSize = 150.0;
+  static const String _cardSizeKey = 'library_card_size';
+
+  final _prefs = SharedPreferencesAsync();
+
   LibraryFilter _filter = LibraryFilter.all;
   String _query = '';
+  double _cardSize = _defaultCardSize;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCardSize();
+  }
+
+  Future<void> _loadCardSize() async {
+    final stored = await _prefs.getDouble(_cardSizeKey);
+    if (stored != null && mounted) {
+      setState(() => _cardSize = stored.clamp(_minCardSize, _maxCardSize));
+    }
+  }
+
+  void _onCardSizeChanged(double value) {
+    setState(() => _cardSize = value);
+    // Fire-and-forget — matches the plugin's own "don't rely on this
+    // for critical data" guidance; a dropped write here just means
+    // next launch uses the previous size, not a broken app.
+    _prefs.setDouble(_cardSizeKey, value);
+  }
 
   List<Book> get _filteredBooks {
     return mockBooks.where((book) {
@@ -92,9 +123,23 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              LibraryFilterTabs(
-                selected: _filter,
-                onSelected: (filter) => setState(() => _filter = filter),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: LibraryFilterTabs(
+                      selected: _filter,
+                      onSelected: (filter) => setState(() => _filter = filter),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ScrollWheelZoomControl(
+                    value: _cardSize,
+                    min: _minCardSize,
+                    max: _maxCardSize,
+                    onChanged: _onCardSizeChanged,
+                  ),
+                ],
               ),
               const SizedBox(height: 18),
               Expanded(
@@ -110,8 +155,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                         // that AppShell overlays via Stack — tune once
                         // MainNavBar's real height is measured.
                         padding: const EdgeInsets.only(bottom: 110),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
+                        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: _cardSize,
                           mainAxisSpacing: 20,
                           crossAxisSpacing: 15,
                           childAspectRatio: 0.58,
