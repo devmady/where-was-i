@@ -1,13 +1,16 @@
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-/// A small metal-gear-styled control for zooming the Library grid's
-/// card size — a side view of a rotating toothed cylinder, shaded to
-/// read as a genuinely 3D glossy metal object rather than a flat
-/// painted bar (drop shadow, glossy highlight cap, beveled teeth,
-/// double-line rim). Drag left/right (or scroll your real mouse
-/// wheel while hovering) to zoom; the teeth and a specular highlight
-/// scroll in sync to read as rotation, independent of the clamped
+/// A small metal-styled control for zooming the Library grid's card
+/// size — a smooth horizontal cylinder with knurled ridges cut into
+/// its curved surface and a rounded (elliptical, foreshortened) end
+/// on the right so it reads as round rather than a flat bar. Drag
+/// left/right (or scroll your real mouse wheel while hovering) to
+/// zoom; the ridges and surface shading scroll along the body like a
+/// tread — the physically correct way to show a cylinder spinning on
+/// its own axis viewed from the side — independent of the clamped
 /// zoom value, so it keeps turning even at the min/max size limits.
 ///
 /// Intentionally uses fixed grey/silver tones instead of
@@ -55,11 +58,11 @@ class _ScrollWheelZoomControlState extends State<ScrollWheelZoomControl> {
         child: MouseRegion(
           cursor: SystemMouseCursors.resizeLeftRight,
           child: SizedBox(
-            width: 72,
+            width: 86,
             height: 40,
             child: CustomPaint(
-              size: const Size(72, 40),
-              painter: _WheelSidePainter(scrollOffset: _scrollOffset),
+              size: const Size(86, 40),
+              painter: _WheelCylinderPainter(scrollOffset: _scrollOffset),
             ),
           ),
         ),
@@ -68,33 +71,47 @@ class _ScrollWheelZoomControlState extends State<ScrollWheelZoomControl> {
   }
 }
 
-class _WheelSidePainter extends CustomPainter {
-  _WheelSidePainter({required this.scrollOffset});
+class _WheelCylinderPainter extends CustomPainter {
+  _WheelCylinderPainter({required this.scrollOffset});
 
   final double scrollOffset;
 
-  static const double _toothSpacing = 10;
-  static const double _toothWidth = 7;
-  static const double _toothFlatTop = 3;
-  static const double _toothHeight = 5;
-  static const double _highlightSpacing = 34;
-  static const double _highlightWidth = 10;
+  static const double _endRadiusX = 9;
+  static const double _ridgeSpacing = 7;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final bodyRect = Rect.fromLTWH(0, _toothHeight + 3, size.width, size.height - (_toothHeight + 3) * 2);
-    final bodyRRect = RRect.fromRectAndRadius(bodyRect, Radius.circular(bodyRect.height / 2));
+    final bodyRect = Rect.fromLTWH(0, 3, size.width, size.height - 6);
+    final mainRight = size.width - _endRadiusX;
+    final barrelRect = Rect.fromLTWH(0, bodyRect.top, mainRight, bodyRect.height);
 
-    // Drop shadow — lifts the whole wheel off the background.
-    canvas.drawRRect(
-      bodyRRect.shift(const Offset(0, 2.5)),
+    // One combined silhouette — straight barrel unioned with a
+    // foreshortened ellipse at the right end — so the fill gradient
+    // and shading flow across both as a single continuous surface.
+    final barrelPath = Path()
+      ..addRRect(RRect.fromRectAndCorners(
+        barrelRect,
+        topLeft: const Radius.circular(3),
+        bottomLeft: const Radius.circular(3),
+      ));
+    final endEllipseRect = Rect.fromCenter(
+      center: Offset(mainRight, bodyRect.top + bodyRect.height / 2),
+      width: _endRadiusX * 2,
+      height: bodyRect.height,
+    );
+    final endPath = Path()..addOval(endEllipseRect);
+    final wholePath = Path.combine(PathOperation.union, barrelPath, endPath);
+
+    // Drop shadow.
+    canvas.drawPath(
+      wholePath.shift(const Offset(0, 2.5)),
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.28)
+        ..color = Colors.black.withValues(alpha: 0.3)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5),
     );
 
     canvas.save();
-    canvas.clipRRect(bodyRRect);
+    canvas.clipPath(wholePath);
 
     // Base metal — vertical gradient, light band near the top.
     const metalGradient = LinearGradient(
@@ -109,15 +126,61 @@ class _WheelSidePainter extends CustomPainter {
       ],
       stops: [0.0, 0.18, 0.5, 0.8, 1.0],
     );
-    canvas.drawRect(bodyRect, Paint()..shader = metalGradient.createShader(bodyRect));
+    final fullBounds = Rect.fromLTWH(0, bodyRect.top, size.width, bodyRect.height);
+    canvas.drawRect(fullBounds, Paint()..shader = metalGradient.createShader(fullBounds));
 
-    // Glossy highlight cap — the classic skeuomorphic "shine" band
-    // that makes a flat gradient read as a rounded, glossy surface.
+    // Rotating cylindrical shading — brightness per vertical strip
+    // from where it sits on the light-wrap, so the surface reads as
+    // turning rather than a static painted gradient.
+    const wrapLength = 46.0;
+    const bandWidth = 2.0;
+    for (var x = 0.0; x < size.width; x += bandWidth) {
+      final theta = ((x + scrollOffset) % wrapLength) / wrapLength * 2 * math.pi;
+      final brightness = math.cos(theta);
+      final bandRect = Rect.fromLTWH(x, bodyRect.top, bandWidth + 0.5, bodyRect.height);
+      if (brightness > 0) {
+        canvas.drawRect(bandRect, Paint()..color = Colors.white.withValues(alpha: brightness * 0.3));
+      } else {
+        canvas.drawRect(bandRect, Paint()..color = Colors.black.withValues(alpha: -brightness * 0.28));
+      }
+    }
+
+    // Knurled ridges — grooves cut into the curved surface. Each is
+    // a dark shadow line with a bright lip just after it, which is
+    // what reads as a raised edge catching light. They're inset from
+    // the top/bottom edges because on a real cylinder the ridges
+    // curve away and flatten out of view near the silhouette.
+    final ridgeInset = bodyRect.height * 0.16;
+    final ridgeTop = bodyRect.top + ridgeInset;
+    final ridgeBottom = bodyRect.bottom - ridgeInset;
+    final ridgeShift = scrollOffset % _ridgeSpacing;
+
+    for (var x = -_ridgeSpacing + ridgeShift; x < size.width; x += _ridgeSpacing) {
+      // Groove shadow.
+      canvas.drawLine(
+        Offset(x, ridgeTop),
+        Offset(x, ridgeBottom),
+        Paint()
+          ..strokeWidth = 1.6
+          ..color = Colors.black.withValues(alpha: 0.32),
+      );
+      // Highlight lip on the trailing side of the groove.
+      canvas.drawLine(
+        Offset(x + 1.4, ridgeTop),
+        Offset(x + 1.4, ridgeBottom),
+        Paint()
+          ..strokeWidth = 1.0
+          ..color = Colors.white.withValues(alpha: 0.45),
+      );
+    }
+
+    // Glossy highlight cap — drawn over the ridges so the whole
+    // surface still reads as one continuous glossy cylinder.
     final glossRect = Rect.fromLTWH(
-      bodyRect.left + bodyRect.width * 0.06,
-      bodyRect.top + bodyRect.height * 0.08,
-      bodyRect.width * 0.88,
-      bodyRect.height * 0.4,
+      2,
+      bodyRect.top + bodyRect.height * 0.06,
+      size.width - 4,
+      bodyRect.height * 0.34,
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(glossRect, Radius.circular(glossRect.height / 2)),
@@ -125,99 +188,65 @@ class _WheelSidePainter extends CustomPainter {
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Colors.white.withValues(alpha: 0.6), Colors.white.withValues(alpha: 0.0)],
+          colors: [Colors.white.withValues(alpha: 0.5), Colors.white.withValues(alpha: 0.0)],
         ).createShader(glossRect),
     );
 
-    // Ambient occlusion — faint darkening near the bottom edge, so
-    // the surface reads as curving away into shadow.
-    final shadeRect = Rect.fromLTWH(
-      bodyRect.left,
-      bodyRect.bottom - bodyRect.height * 0.22,
-      bodyRect.width,
-      bodyRect.height * 0.22,
-    );
+    // Edge darkening top and bottom — the surface curving away from
+    // the viewer at the silhouette, which is what sells roundness.
+    final topEdge = Rect.fromLTWH(0, bodyRect.top, size.width, bodyRect.height * 0.2);
     canvas.drawRect(
-      shadeRect,
+      topEdge,
       Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Colors.black.withValues(alpha: 0.0), Colors.black.withValues(alpha: 0.22)],
-        ).createShader(shadeRect),
+          colors: [Colors.black.withValues(alpha: 0.3), Colors.black.withValues(alpha: 0.0)],
+        ).createShader(topEdge),
+    );
+    final bottomEdge = Rect.fromLTWH(
+      0,
+      bodyRect.bottom - bodyRect.height * 0.26,
+      size.width,
+      bodyRect.height * 0.26,
+    );
+    canvas.drawRect(
+      bottomEdge,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Colors.black.withValues(alpha: 0.0), Colors.black.withValues(alpha: 0.42)],
+        ).createShader(bottomEdge),
     );
 
-    // Rotating specular streaks — scroll in sync with the teeth so
-    // the whole thing reads as turning, not just a sliding pattern.
-    final highlightShift = scrollOffset % _highlightSpacing;
-    for (var x = -_highlightSpacing + highlightShift; x < size.width + _highlightSpacing; x += _highlightSpacing) {
-      final streakRect = Rect.fromLTWH(x, bodyRect.top, _highlightWidth, bodyRect.height);
-      canvas.drawRect(
-        streakRect,
-        Paint()
-          ..shader = LinearGradient(
-            colors: [
-              Colors.white.withValues(alpha: 0.0),
-              Colors.white.withValues(alpha: 0.35),
-              Colors.white.withValues(alpha: 0.0),
-            ],
-          ).createShader(streakRect),
-      );
-    }
     canvas.restore();
 
-    // Teeth — flat-topped trapezoids with a small top-edge highlight
-    // so each tooth reads as a 3D block, not a flat grey shape.
-    final toothFill = Paint()..color = const Color(0xFF5E5E5E);
-    final toothHighlight = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.8
-      ..color = Colors.white.withValues(alpha: 0.5);
-    final leadIn = (_toothWidth - _toothFlatTop) / 2;
-    final shift = scrollOffset % _toothSpacing;
-
-    for (var x = -_toothSpacing + shift; x < size.width + _toothSpacing; x += _toothSpacing) {
-      final topPeak = bodyRect.top - _toothHeight;
-      final topTip1 = Offset(x + leadIn, topPeak);
-      final topTip2 = Offset(x + leadIn + _toothFlatTop, topPeak);
-      final topTooth = Path()
-        ..moveTo(x, bodyRect.top)
-        ..lineTo(topTip1.dx, topTip1.dy)
-        ..lineTo(topTip2.dx, topTip2.dy)
-        ..lineTo(x + _toothWidth, bodyRect.top)
-        ..close();
-      canvas.drawPath(topTooth, toothFill);
-      canvas.drawLine(topTip1, topTip2, toothHighlight);
-
-      final bottomPeak = bodyRect.bottom + _toothHeight;
-      final bottomTooth = Path()
-        ..moveTo(x, bodyRect.bottom)
-        ..lineTo(x + leadIn, bottomPeak)
-        ..lineTo(x + leadIn + _toothFlatTop, bottomPeak)
-        ..lineTo(x + _toothWidth, bodyRect.bottom)
-        ..close();
-      canvas.drawPath(bottomTooth, toothFill);
-    }
-
-    // Double-line rim — a dark outer edge plus a thin bright inner
-    // line just inside it, like a polished metal lip.
-    canvas.drawRRect(
-      bodyRRect,
+    // Outer rim — dark outline plus a thin bright inner line, like a
+    // polished metal lip catching light.
+    canvas.drawPath(
+      wholePath,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0
-        ..color = const Color(0xFF2E2E2E).withValues(alpha: 0.75),
+        ..strokeWidth = 1.2
+        ..color = const Color(0xFF262626).withValues(alpha: 0.8),
     );
-    canvas.drawRRect(
-      bodyRRect.deflate(1.4),
+
+    // Seam where the rounded end meets the barrel — a subtle arc that
+    // hints at the cylinder's end cap without drawing a hard edge.
+    canvas.drawArc(
+      endEllipseRect,
+      -math.pi / 2,
+      math.pi,
+      false,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.6
-        ..color = Colors.white.withValues(alpha: 0.35),
+        ..strokeWidth = 0.8
+        ..color = Colors.white.withValues(alpha: 0.28),
     );
   }
 
   @override
-  bool shouldRepaint(covariant _WheelSidePainter oldDelegate) =>
+  bool shouldRepaint(covariant _WheelCylinderPainter oldDelegate) =>
       oldDelegate.scrollOffset != scrollOffset;
 }
