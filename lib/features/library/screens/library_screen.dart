@@ -28,6 +28,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
   static const double _defaultCardSize = 150.0;
   static const String _cardSizeKey = 'library_card_size';
 
+  // Cell height is computed explicitly rather than via a fixed
+  // childAspectRatio, because the text block below the cover needs
+  // roughly the same PIXEL height regardless of card width — a
+  // single ratio can't be correct at every zoom level and window
+  // size simultaneously, which is exactly what caused the overflow.
+  static const double _coverAspectRatio = 0.75; // width / height
+  static const double _textBlockHeight = 80.0; // title(2 lines) + author + progress bar + spacing, with headroom
+
   final _prefs = SharedPreferencesAsync();
 
   LibraryFilter _filter = LibraryFilter.all;
@@ -159,7 +167,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                           maxCrossAxisExtent: _cardSize,
                           mainAxisSpacing: 20,
                           crossAxisSpacing: 15,
-                          childAspectRatio: 0.58,
+                          mainAxisExtent: _cardSize / _coverAspectRatio + _textBlockHeight,
                         ),
                         itemCount: books.length,
                         itemBuilder: (context, index) => BookCard(book: books[index]),

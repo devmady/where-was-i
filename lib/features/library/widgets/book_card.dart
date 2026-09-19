@@ -22,8 +22,7 @@ class BookCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AspectRatio(
-            aspectRatio: 0.75,
+          Expanded(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest,
@@ -42,14 +41,22 @@ class BookCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Text(
-            book.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              height: 1.2,
+          SizedBox(
+            // Fixed regardless of whether this title actually wraps
+            // to 1 or 2 lines — otherwise a short title "gives back"
+            // space to the Expanded cover above it, and covers end up
+            // different heights across the same row (13 * 1.2 line
+            // height * 2 lines = 31.2, rounded up).
+            height: 32,
+            child: Text(
+              book.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                height: 1.2,
+              ),
             ),
           ),
           const SizedBox(height: 2),
