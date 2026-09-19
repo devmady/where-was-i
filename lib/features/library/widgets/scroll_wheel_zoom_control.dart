@@ -77,7 +77,7 @@ class _WheelCylinderPainter extends CustomPainter {
   final double scrollOffset;
 
   static const double _endRadiusX = 9;
-  static const double _ridgeSpacing = 7;
+  static const double _ridgeSpacing = 13;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -129,22 +129,6 @@ class _WheelCylinderPainter extends CustomPainter {
     final fullBounds = Rect.fromLTWH(0, bodyRect.top, size.width, bodyRect.height);
     canvas.drawRect(fullBounds, Paint()..shader = metalGradient.createShader(fullBounds));
 
-    // Rotating cylindrical shading — brightness per vertical strip
-    // from where it sits on the light-wrap, so the surface reads as
-    // turning rather than a static painted gradient.
-    const wrapLength = 46.0;
-    const bandWidth = 2.0;
-    for (var x = 0.0; x < size.width; x += bandWidth) {
-      final theta = ((x + scrollOffset) % wrapLength) / wrapLength * 2 * math.pi;
-      final brightness = math.cos(theta);
-      final bandRect = Rect.fromLTWH(x, bodyRect.top, bandWidth + 0.5, bodyRect.height);
-      if (brightness > 0) {
-        canvas.drawRect(bandRect, Paint()..color = Colors.white.withValues(alpha: brightness * 0.3));
-      } else {
-        canvas.drawRect(bandRect, Paint()..color = Colors.black.withValues(alpha: -brightness * 0.28));
-      }
-    }
-
     // Knurled ridges — grooves cut into the curved surface. Each is
     // a dark shadow line with a bright lip just after it, which is
     // what reads as a raised edge catching light. They're inset from
@@ -161,16 +145,16 @@ class _WheelCylinderPainter extends CustomPainter {
         Offset(x, ridgeTop),
         Offset(x, ridgeBottom),
         Paint()
-          ..strokeWidth = 1.6
-          ..color = Colors.black.withValues(alpha: 0.32),
+          ..strokeWidth = 1.2
+          ..color = Colors.black.withValues(alpha: 0.16),
       );
       // Highlight lip on the trailing side of the groove.
       canvas.drawLine(
         Offset(x + 1.4, ridgeTop),
         Offset(x + 1.4, ridgeBottom),
         Paint()
-          ..strokeWidth = 1.0
-          ..color = Colors.white.withValues(alpha: 0.45),
+          ..strokeWidth = 0.8
+          ..color = Colors.white.withValues(alpha: 0.22),
       );
     }
 
