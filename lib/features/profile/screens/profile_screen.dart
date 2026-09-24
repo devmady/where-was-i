@@ -1,181 +1,215 @@
 import 'package:flutter/material.dart';
-import '../../../main.dart' show themeModeNotifier;
+
+import '../../../core/app_info.dart';
+import '../../../core/theme/app_fonts.dart';
+import '../../../shared/widgets/content_column.dart';
+import '../models/reminder_settings.dart';
+import '../models/user_profile.dart';
+import '../state/profile_store.dart';
+import '../widgets/monogram_avatar.dart';
+import '../widgets/reading_goal_card.dart';
+import '../widgets/settings_widgets.dart';
+import '../widgets/theme_mode_control.dart';
+import 'about_screen.dart';
+import 'backup_screen.dart';
+import 'edit_profile_screen.dart';
+import 'reminders_screen.dart';
 
 /// Profile screen — right of the Home center.
 ///
-/// No login/account system (local-only app), so the profile card
-/// shows a locally-set nickname + optional local photo only.
-/// Below it: a settings list (theme, notifications, backup, about).
+/// No login/account system (local-only app): the header shows a locally-set
+/// name and optional local photo. Below it, the reading-goal shelf and the
+/// settings list (appearance, reminders, backup, about). Every sub-screen is
+/// pushed on top of the shell, so the floating nav pill hides while editing.
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
+  /// Bottom space kept clear for the floating nav pill in AppShell.
+  static const double _navClearance = 112;
+
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
+    final store = ProfileStore.instance;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: colors.surface,
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-          children: const [
-            _ProfileCard(),
-            SizedBox(height: 28),
-            _SettingsSection(),
-          ],
+        child: ContentColumn(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, _navClearance),
+            children: [
+              const _IdentityHeader(),
+              const SizedBox(height: 28),
+              const ReadingGoalCard(),
+              const SizedBox(height: 28),
+              SettingsSection(
+                label: 'Preferences',
+                child: SettingsGroup(
+                  children: [
+                    const _AppearanceRow(),
+                    ValueListenableBuilder<ReminderSettings>(
+                      valueListenable: store.reminders,
+                      builder: (context, reminders, _) => SettingsRow(
+                        icon: Icons.notifications_outlined,
+                        title: 'Reminders',
+                        subtitle: reminders.summary(context),
+                        onTap: () => _push(context, const RemindersScreen()),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+              SettingsSection(
+                label: 'Your data',
+                footnote:
+                    'Your library lives on this device. No account needed.',
+                child: SettingsGroup(
+                  children: [
+                    ValueListenableBuilder<DateTime?>(
+                      valueListenable: store.lastBackup,
+                      builder: (context, last, _) => SettingsRow(
+                        icon: Icons.download_outlined,
+                        title: 'Back up & export',
+                        subtitle: last == null
+                            ? 'Last backup: never'
+                            : 'Last backup: ${MaterialLocalizations.of(context).formatShortMonthDay(last)}',
+                        onTap: () => _push(context, const BackupScreen()),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+              SettingsSection(
+                label: 'About',
+                child: SettingsGroup(
+                  children: [
+                    SettingsRow(
+                      icon: Icons.info_outline,
+                      title: 'About $kAppName',
+                      subtitle: 'Version $kAppVersion',
+                      onTap: () => _push(context, const AboutScreen()),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Profile card: photo circle on the right, name + detail on the left.
-///
-/// name/photo are hardcoded placeholders for now — wire up to local
-/// storage (a simple key-value prefs entry, not Drift) once the
-/// "edit profile" flow exists.
-class _ProfileCard extends StatelessWidget {
-  const _ProfileCard();
+Future<void> _push(BuildContext context, Widget screen) {
+  return Navigator.of(context).push<void>(
+    MaterialPageRoute<void>(builder: (_) => screen),
+  );
+}
+
+// English-only until the app is localized.
+const List<String> _months = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+String _monthYear(DateTime date) => '${_months[date.month - 1]} ${date.year}';
+
+/// Monogram + name + On this device since ..., with an explicit edit button
+/// (no hidden tap target).
+class _IdentityHeader extends StatelessWidget {
+  const _IdentityHeader();
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Reader', // placeholder nickname
-                  style: textTheme.titleLarge,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Tap to edit profile', // placeholder detail line
-                  style: textTheme.bodySmall,
-                ),
-              ],
+    return ValueListenableBuilder<UserProfile>(
+      valueListenable: ProfileStore.instance.profile,
+      builder: (context, profile, _) {
+        return Row(
+          children: [
+            MonogramAvatar(
+              size: 72,
+              initial: profile.initial,
+              photoPath: profile.photoPath,
             ),
-          ),
-          const SizedBox(width: 16),
-          CircleAvatar(
-            radius: 32,
-            backgroundColor: colorScheme.primary.withValues(alpha: 0.15),
-            child: Icon(
-              Icons.person_outline,
-              size: 32,
-              color: colorScheme.primary,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    profile.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppFonts.serifStyle(
+                      size: 28,
+                      height: 1.2,
+                      color: colors.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'On this device since ${_monthYear(profile.since)}',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            // swap for a real local photo (Image provider) once
-            // photo picking is wired up. Falls back to this icon when
-            // no photo is set.
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SettingsSection extends StatelessWidget {
-  const _SettingsSection();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SettingsTile(
-          icon: Icons.palette_outlined,
-          title: 'Theme',
-          trailing: _ThemeModeSelector(),
-        ),
-        const Divider(height: 1),
-        const _SettingsTile(
-          icon: Icons.notifications_outlined,
-          title: 'Notifications',
-        ),
-        const Divider(height: 1),
-        const _SettingsTile(
-          icon: Icons.download_outlined,
-          title: 'Export / Backup Data',
-        ),
-        const Divider(height: 1),
-        const _SettingsTile(
-          icon: Icons.info_outline,
-          title: 'About',
-          subtitle: 'Where Was I? — v0.1.0',
-        ),
-      ],
-    );
-  }
-}
-
-class _SettingsTile extends StatelessWidget {
-  const _SettingsTile({
-    required this.icon,
-    required this.title,
-    this.subtitle,
-    this.trailing,
-  });
-
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final Widget? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: colorScheme.onSurface.withValues(alpha: 0.7)),
-      title: Text(title),
-      subtitle: subtitle != null ? Text(subtitle!) : null,
-      trailing: trailing ?? const Icon(Icons.chevron_right, size: 20),
-      onTap: trailing == null
-          ? () {
-              // wire up Notifications / Export / About actions
-              // once their respective flows exist.
-            }
-          : null,
-    );
-  }
-}
-
-
-/// Theme mode selector: light / dark / system, wired to the app-wide
-/// ValueNotifier in main.dart so changes apply instantly everywhere.
-class _ThemeModeSelector extends StatelessWidget {
-  const _ThemeModeSelector();
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeModeNotifier,
-      builder: (context, currentMode, _) {
-        return DropdownButton<ThemeMode>(
-          value: currentMode,
-          underline: const SizedBox.shrink(),
-          items: const [
-            DropdownMenuItem(value: ThemeMode.system, child: Text('System')),
-            DropdownMenuItem(value: ThemeMode.light, child: Text('Light')),
-            DropdownMenuItem(value: ThemeMode.dark, child: Text('Dark')),
+            const SizedBox(width: 12),
+            IconButton.outlined(
+              tooltip: 'Edit profile',
+              onPressed: () => _push(context, const EditProfileScreen()),
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              style: IconButton.styleFrom(
+                fixedSize: const Size(40, 40),
+                side: BorderSide(color: colors.outline),
+                foregroundColor: colors.onSurfaceVariant,
+              ),
+            ),
           ],
-          onChanged: (mode) {
-            if (mode != null) themeModeNotifier.value = mode;
-          },
         );
       },
+    );
+  }
+}
+
+class _AppearanceRow extends StatelessWidget {
+  const _AppearanceRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.palette_outlined, size: 22, color: colors.onSurfaceVariant),
+              const SizedBox(width: 16),
+              Text(
+                'Appearance',
+                style: textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: colors.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const ThemeModeControl(),
+        ],
+      ),
     );
   }
 }

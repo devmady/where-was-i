@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/library/screens/library_screen.dart';
+import '../../features/library/widgets/add_book_sheet.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import 'main_nav_bar.dart';
 
@@ -41,10 +42,10 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _openAddBookSheet() {
-    // open the add-book dialog/banner once it exists (handoff
-    // doc §6, item 3). Shared by both entry points — LibraryScreen's
-    // "+" button (primary) and the Home long-press (secondary
-    // shortcut) — so they never drift into two different flows.
+    // Opens the shared add-book sheet. The plus button in the Library header
+    // opens the very same sheet, so the two entry points never drift into
+    // two different flows.
+    showAddBookSheet(context);
   }
 
   @override
@@ -57,7 +58,7 @@ class _AppShellState extends State<AppShell> {
             controller: _pageController,
             onPageChanged: _onPageChanged,
             children: [
-              LibraryScreen(onAddBook: _openAddBookSheet),
+              const LibraryScreen(),
               const HomeScreen(),
               const ProfileScreen(),
             ],

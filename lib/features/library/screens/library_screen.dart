@@ -1,179 +1,355 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/book.dart';
-import '../widgets/book_card.dart';
-import '../widgets/library_filter_tabs.dart';
-import '../widgets/scroll_wheel_zoom_control.dart';
+import '../../../core/database/app_database.dart' show Book;
+import '../../../core/database/tables.dart' show BookStatus;
+import '../../../core/theme/app_fonts.dart';
+import '../../../shared/widgets/content_column.dart';
+import '../../../shared/widgets/field_decoration.dart';
+import '../state/book_repository.dart';
+import '../widgets/add_book_sheet.dart';
+import '../widgets/book_grid_card.dart';
+import '../widgets/empty_shelf_card.dart';
+import 'book_detail_screen.dart';
 
-/// Library screen — left of the Home center, holds the book list.
-/// Primary add-book entry point lives here (top bar "+"), sharing the
-/// same trigger as the Home long-press shortcut per the locked nav
-/// plan (see AppShell).
+enum _LibraryFilter { all, reading, wantToRead, finished }
+
+/// Library screen, left of the Home center. Every book as a cover grid, with
+/// filters by status, a simple search, and the add button in the header.
 class LibraryScreen extends StatefulWidget {
-  const LibraryScreen({super.key, this.onAddBook});
-
-  /// Opens the shared add-book dialog/banner. Not built yet (see
-  /// handoff doc §6) — currently wired to the same stub as the Home
-  /// long-press shortcut.
-  final VoidCallback? onAddBook;
+  const LibraryScreen({super.key});
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
-  static const double _minCardSize = 110.0;
-  static const double _maxCardSize = 220.0;
-  static const double _defaultCardSize = 150.0;
-  static const String _cardSizeKey = 'library_card_size';
+  static const double _navClearance = 112;
 
-  // Cell height is computed explicitly rather than via a fixed
-  // childAspectRatio, because the text block below the cover needs
-  // roughly the same PIXEL height regardless of card width — a
-  // single ratio can't be correct at every zoom level and window
-  // size simultaneously, which is exactly what caused the overflow.
-  static const double _coverAspectRatio = 0.75; // width / height
-  static const double _textBlockHeight = 80.0; // title(2 lines) + author + progress bar + spacing, with headroom
+  static const Map<_LibraryFilter, String> _labels = {
+    _LibraryFilter.all: 'All',
+    _LibraryFilter.reading: 'Reading',
+    _LibraryFilter.wantToRead: 'Want to read',
+    _LibraryFilter.finished: 'Finished',
+  };
 
-  final _prefs = SharedPreferencesAsync();
+  final Stream<List<Book>> _books = BookRepository.instance.watchAll();
+  final TextEditingController _query = TextEditingController();
 
-  LibraryFilter _filter = LibraryFilter.all;
-  String _query = '';
-  double _cardSize = _defaultCardSize;
+  _LibraryFilter _filter = _LibraryFilter.all;
+  bool _searching = false;
 
   @override
-  void initState() {
-    super.initState();
-    _loadCardSize();
+  void dispose() {
+    _query.dispose();
+    super.dispose();
   }
 
-  Future<void> _loadCardSize() async {
-    final stored = await _prefs.getDouble(_cardSizeKey);
-    if (stored != null && mounted) {
-      setState(() => _cardSize = stored.clamp(_minCardSize, _maxCardSize));
-    }
-  }
-
-  void _onCardSizeChanged(double value) {
-    setState(() => _cardSize = value);
-    // Fire-and-forget — matches the plugin's own "don't rely on this
-    // for critical data" guidance; a dropped write here just means
-    // next launch uses the previous size, not a broken app.
-    _prefs.setDouble(_cardSizeKey, value);
-  }
-
-  List<Book> get _filteredBooks {
-    return mockBooks.where((book) {
+  List<Book> _apply(List<Book> all) {
+    final query = _query.text.trim().toLowerCase();
+    return all.where((book) {
       final matchesFilter = switch (_filter) {
-        LibraryFilter.all => true,
-        LibraryFilter.reading => book.status == BookStatus.reading,
-        LibraryFilter.done => book.status == BookStatus.done,
-        LibraryFilter.queued => book.status == BookStatus.queued,
+        _LibraryFilter.all => true,
+        _LibraryFilter.reading => book.status == BookStatus.reading,
+        _LibraryFilter.wantToRead => book.status == BookStatus.wantToRead,
+        _LibraryFilter.finished => book.status == BookStatus.finished,
       };
-      final query = _query.trim().toLowerCase();
-      final matchesQuery = query.isEmpty ||
-          book.title.toLowerCase().contains(query) ||
-          book.author.toLowerCase().contains(query);
-      return matchesFilter && matchesQuery;
+      if (!matchesFilter) return false;
+      if (query.isEmpty) return true;
+      return book.title.toLowerCase().contains(query) ||
+          (book.author ?? '').toLowerCase().contains(query);
     }).toList();
+  }
+
+  String _emptyMessage() {
+    if (_query.text.trim().isNotEmpty) return 'No books match that search.';
+    return switch (_filter) {
+      _LibraryFilter.all => 'No books yet.',
+      _LibraryFilter.reading => 'Books you are reading show up here.',
+      _LibraryFilter.wantToRead => 'Books you want to read show up here.',
+      _LibraryFilter.finished => 'Books you finish show up here.',
+    };
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final books = _filteredBooks;
+    final colors = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: colors.surface,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: ContentColumn(
+          maxWidth: 900,
+          child: StreamBuilder<List<Book>>(
+            stream: _books,
+            builder: (context, snapshot) {
+              final all = snapshot.data ?? const <Book>[];
+              final visible = _apply(all);
+
+              return CustomScrollView(
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: _searching
+                          ? _buildSearch(context)
+                          : _buildHeader(context, visible.length),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                    sliver: SliverToBoxAdapter(child: _buildFilters()),
+                  ),
+                  ..._buildBody(context, snapshot, all, visible),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, int count) {
+    final colors = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Row(
+      children: [
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Library',
-                    style: textTheme.titleLarge?.copyWith(fontSize: 28),
-                  ),
-                  FilledButton.icon(
-                    onPressed: widget.onAddBook,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Add'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colorScheme.primary,
-                      foregroundColor: colorScheme.onPrimary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                onChanged: (value) => setState(() => _query = value),
-                style: textTheme.bodyMedium,
-                decoration: InputDecoration(
-                  hintText: 'Search your library…',
-                  filled: true,
-                  fillColor: colorScheme.surfaceContainerHighest,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none,
+              Semantics(
+                header: true,
+                child: Text(
+                  'Library',
+                  style: AppFonts.serifStyle(
+                    size: 30,
+                    height: 1.25,
+                    color: colors.onSurface,
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: LibraryFilterTabs(
-                      selected: _filter,
-                      onSelected: (filter) => setState(() => _filter = filter),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ScrollWheelZoomControl(
-                    value: _cardSize,
-                    min: _minCardSize,
-                    max: _maxCardSize,
-                    onChanged: _onCardSizeChanged,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Expanded(
-                child: books.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No books here yet.',
-                          style: textTheme.bodySmall,
-                        ),
-                      )
-                    : GridView.builder(
-                        // Bottom padding clears the floating nav pill
-                        // that AppShell overlays via Stack — tune once
-                        // MainNavBar's real height is measured.
-                        padding: const EdgeInsets.only(bottom: 110),
-                        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: _cardSize,
-                          mainAxisSpacing: 20,
-                          crossAxisSpacing: 15,
-                          mainAxisExtent: _cardSize / _coverAspectRatio + _textBlockHeight,
-                        ),
-                        itemCount: books.length,
-                        itemBuilder: (context, index) => BookCard(book: books[index]),
-                      ),
+              const SizedBox(height: 2),
+              Text(
+                '$count ${count == 1 ? 'book' : 'books'}',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
               ),
             ],
+          ),
+        ),
+        IconButton.outlined(
+          tooltip: 'Search',
+          onPressed: () => setState(() => _searching = true),
+          icon: const Icon(Icons.search, size: 20),
+          style: IconButton.styleFrom(
+            fixedSize: const Size(40, 40),
+            side: BorderSide(color: colors.outline),
+            foregroundColor: colors.onSurface,
+          ),
+        ),
+        const SizedBox(width: 10),
+        IconButton.filled(
+          tooltip: 'Add a book',
+          onPressed: () => showAddBookSheet(context),
+          icon: const Icon(Icons.add, size: 22),
+          style: IconButton.styleFrom(fixedSize: const Size(40, 40)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearch(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _query,
+            autofocus: true,
+            textInputAction: TextInputAction.search,
+            onChanged: (_) => setState(() {}),
+            decoration: appFieldDecoration(
+              context,
+              label: 'Search title or author',
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        IconButton.outlined(
+          tooltip: 'Close search',
+          onPressed: () => setState(() {
+            _query.clear();
+            _searching = false;
+          }),
+          icon: const Icon(Icons.close, size: 20),
+          style: IconButton.styleFrom(
+            fixedSize: const Size(40, 40),
+            side: BorderSide(color: colors.outline),
+            foregroundColor: colors.onSurface,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilters() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final filter in _LibraryFilter.values)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: _FilterChip(
+                label: _labels[filter] ?? '',
+                selected: _filter == filter,
+                onTap: () => setState(() => _filter = filter),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildBody(
+    BuildContext context,
+    AsyncSnapshot<List<Book>> snapshot,
+    List<Book> all,
+    List<Book> visible,
+  ) {
+    final colors = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    if (snapshot.hasError) {
+      return const <Widget>[
+        SliverPadding(
+          padding: EdgeInsets.all(20),
+          sliver: SliverToBoxAdapter(
+            child: Text('Could not load your library.'),
+          ),
+        ),
+      ];
+    }
+    if (!snapshot.hasData) return const <Widget>[];
+
+    if (all.isEmpty) {
+      return <Widget>[
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, _navClearance),
+          sliver: SliverToBoxAdapter(
+            child: EmptyShelfCard(onAdd: () => showAddBookSheet(context)),
+          ),
+        ),
+      ];
+    }
+
+    if (visible.isEmpty) {
+      return <Widget>[
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 32, 20, _navClearance),
+          sliver: SliverToBoxAdapter(
+            child: Text(
+              _emptyMessage(),
+              textAlign: TextAlign.center,
+              style: textTheme.bodyLarge?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ),
+      ];
+    }
+
+    return <Widget>[
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, _navClearance),
+        sliver: SliverLayoutBuilder(
+          builder: (context, constraints) {
+            const gap = 12.0;
+            final extent = constraints.crossAxisExtent;
+            final columns = math.max(3, (extent / 150).floor());
+            final itemWidth = (extent - gap * (columns - 1)) / columns;
+            final statusHeight = 10 + MediaQuery.textScalerOf(context).scale(16);
+
+            return SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columns,
+                mainAxisSpacing: 20,
+                crossAxisSpacing: gap,
+                mainAxisExtent: itemWidth * 1.5 + statusHeight,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final book = visible[index];
+                  return BookGridCard(
+                    book: book,
+                    onTap: () => Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => BookDetailScreen(bookId: book.id),
+                      ),
+                    ),
+                  );
+                },
+                childCount: visible.length,
+              ),
+            );
+          },
+        ),
+      ),
+    ];
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: Material(
+          color: selected ? colors.primaryContainer : Colors.transparent,
+          shape: StadiumBorder(
+            side: selected
+                ? BorderSide.none
+                : BorderSide(color: colors.outline),
+          ),
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Text(
+                label,
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: selected
+                      ? colors.onPrimaryContainer
+                      : colors.onSurfaceVariant,
+                ),
+              ),
+            ),
           ),
         ),
       ),
