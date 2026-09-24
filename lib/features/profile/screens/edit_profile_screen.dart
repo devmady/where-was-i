@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_fonts.dart';
-import '../../../shared/widgets/coming_soon.dart';
+import '../../../shared/state/image_storage.dart';
 import '../models/user_profile.dart';
 import '../state/profile_store.dart';
 import '../widgets/monogram_avatar.dart';
@@ -22,6 +22,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _name;
   late int _goal;
   String? _photoPath;
+  String? _originalPhotoPath;
+  bool _pickingPhoto = false;
   String? _nameError;
 
   @override
@@ -31,12 +33,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _name = TextEditingController(text: profile.name);
     _goal = profile.yearlyGoal;
     _photoPath = profile.photoPath;
+    _originalPhotoPath = profile.photoPath;
   }
 
   @override
   void dispose() {
     _name.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickPhoto() async {
+    setState(() => _pickingPhoto = true);
+    final path = await ImageStorage.pickAndSave(prefix: 'profile');
+    if (!mounted) return;
+    setState(() => _pickingPhoto = false);
+    if (path == null) return;
+    final previous = _photoPath;
+    setState(() => _photoPath = path);
+    if (previous != null && previous != path) {
+      await ImageStorage.deleteIfExists(previous);
+    }
+  }
+
+  Future<void> _removePhoto() async {
+    setState(() => _photoPath = null);
   }
 
   void _save() {
@@ -52,6 +72,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       photoPath: _photoPath,
       clearPhoto: _photoPath == null,
     );
+    if (_photoPath != _originalPhotoPath) {
+      ImageStorage.deleteIfExists(_originalPhotoPath);
+    }
     Navigator.of(context).pop();
   }
 
@@ -91,14 +114,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               spacing: 8,
               children: [
                 OutlinedButton.icon(
-                  // Pending: pick an image from the device, copy it into
-                  // app storage, and set _photoPath.
-                  onPressed: () => showComingSoon(
-                    context,
-                    'Photo picking is not wired up yet.',
-                  ),
-                  icon: const Icon(Icons.image_outlined, size: 18),
-                  label: const Text('Choose photo'),
+                  onPressed: _pickingPhoto ? null : _pickPhoto,
+                  icon: _pickingPhoto
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.image_outlined, size: 18),
+                  label: Text(_pickingPhoto ? 'Choosing...' : 'Choose photo'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: colors.onSurface,
                     side: BorderSide(color: colors.outline),
@@ -106,9 +130,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                 ),
                 TextButton(
-                  onPressed: _photoPath == null
-                      ? null
-                      : () => setState(() => _photoPath = null),
+                  onPressed: _photoPath == null ? null : _removePhoto,
                   child: const Text('Use my initial'),
                 ),
               ],

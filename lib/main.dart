@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'core/state/theme_mode_store.dart';
 import 'core/theme/app_theme.dart';
 import 'shared/widgets/app_shell.dart';
 
@@ -7,7 +8,12 @@ import 'shared/widgets/app_shell.dart';
 /// state management package. Defaults to following the OS setting.
 final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier(ThemeMode.system);
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  themeModeNotifier.value = await ThemeModeStore.load();
+  themeModeNotifier.addListener(() {
+    ThemeModeStore.save(themeModeNotifier.value);
+  });
   runApp(const WhereWasIApp());
 }
 

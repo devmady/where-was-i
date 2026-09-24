@@ -8,7 +8,7 @@ import '../../../core/database/tables.dart' show BookStatus;
 import '../../../core/date_labels.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/theme/app_theme.dart' show AppTagColors;
-import '../../../shared/widgets/coming_soon.dart';
+import '../../../shared/state/image_storage.dart';
 import '../../../shared/widgets/dashed_border.dart';
 import '../../../shared/widgets/field_decoration.dart';
 import '../../../shared/widgets/segmented_choice.dart';
@@ -49,7 +49,9 @@ class _AddBookSheetState extends State<_AddBookSheet> {
   DateTime _finishedOn = DateTime.now();
   int? _tag;
   String? _coverPath;
+  bool _pickingPhoto = false;
 
+  String? _originalCoverPath;
   String? _titleError;
   String? _totalError;
   String? _currentError;
@@ -68,6 +70,7 @@ class _AddBookSheetState extends State<_AddBookSheet> {
     _current = TextEditingController();
     _tag = book?.tagColor;
     _coverPath = book?.coverPath;
+    _originalCoverPath = book?.coverPath;
   }
 
   @override
@@ -77,6 +80,25 @@ class _AddBookSheetState extends State<_AddBookSheet> {
     _total.dispose();
     _current.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickPhoto() async {
+    setState(() => _pickingPhoto = true);
+    final path = await ImageStorage.pickAndSave(prefix: 'cover');
+    if (!mounted) return;
+    setState(() => _pickingPhoto = false);
+    if (path == null) return;
+    final previous = _coverPath;
+    setState(() => _coverPath = path);
+    if (previous != null && previous != path) {
+      await ImageStorage.deleteIfExists(previous);
+    }
+  }
+
+  Future<void> _removePhoto() async {
+    final previous = _coverPath;
+    setState(() => _coverPath = null);
+    await ImageStorage.deleteIfExists(previous);
   }
 
   Future<void> _pickDate() async {
@@ -143,6 +165,9 @@ class _AddBookSheetState extends State<_AddBookSheet> {
     }
 
     if (!mounted) return;
+    if (_coverPath != _originalCoverPath) {
+      await ImageStorage.deleteIfExists(_originalCoverPath);
+    }
     navigator.pop();
   }
 
@@ -368,12 +393,19 @@ class _AddBookSheetState extends State<_AddBookSheet> {
                     spacing: 8,
                     children: [
                       OutlinedButton.icon(
-                        onPressed: () => showComingSoon(
-                          context,
-                          'Photo picking is not added yet.',
+                        onPressed: _pickingPhoto ? null : _pickPhoto,
+                        icon: _pickingPhoto
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.image_outlined, size: 18),
+                        label: Text(
+                          _pickingPhoto ? 'Choosing...' : 'Choose photo',
                         ),
-                        icon: const Icon(Icons.image_outlined, size: 18),
-                        label: const Text('Choose photo'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: colors.onSurface,
                           side: BorderSide(color: colors.outline),
@@ -382,7 +414,7 @@ class _AddBookSheetState extends State<_AddBookSheet> {
                       ),
                       if (path != null)
                         TextButton(
-                          onPressed: () => setState(() => _coverPath = null),
+                          onPressed: _removePhoto,
                           child: const Text('Remove'),
                         ),
                     ],
