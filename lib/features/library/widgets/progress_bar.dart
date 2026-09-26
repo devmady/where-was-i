@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// A slim progress bar. Terracotta means where you are now, matching the
-/// spines on the profile shelf.
+/// A slim progress bar. Teal fill means where you are now, matching the
+/// app's primary accent used for active state elsewhere (nav bar, buttons).
 class ProgressBar extends StatelessWidget {
   const ProgressBar({super.key, required this.value, this.height = 4});
 
@@ -20,7 +20,7 @@ class ProgressBar extends StatelessWidget {
         height: height,
         width: double.infinity,
         child: ColoredBox(
-          color: colors.outlineVariant,
+          color: colors.surfaceContainerHigh,
           child: LayoutBuilder(
             builder: (context, constraints) {
               return Align(
@@ -28,7 +28,7 @@ class ProgressBar extends StatelessWidget {
                 child: Container(
                   width: constraints.maxWidth * clamped,
                   height: height,
-                  color: colors.secondary,
+                  color: colors.primary,
                 ),
               );
             },
