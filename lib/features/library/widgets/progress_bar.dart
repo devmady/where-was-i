@@ -12,19 +12,26 @@ class ProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final clamped = value.clamp(0.0, 1.0).toDouble();
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(height / 2),
       child: SizedBox(
         height: height,
+        width: double.infinity,
         child: ColoredBox(
           color: colors.outlineVariant,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: FractionallySizedBox(
-              widthFactor: value.clamp(0.0, 1.0).toDouble(),
-              child: ColoredBox(color: colors.secondary),
-            ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  width: constraints.maxWidth * clamped,
+                  height: height,
+                  color: colors.secondary,
+                ),
+              );
+            },
           ),
         ),
       ),

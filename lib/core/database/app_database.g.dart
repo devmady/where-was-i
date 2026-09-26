@@ -27,10 +27,6 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     'title',
     aliasedName,
     false,
-    additionalChecks: GeneratedColumn.checkTextLength(
-      minTextLength: 1,
-      maxTextLength: 200,
-    ),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
@@ -67,12 +63,12 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     defaultValue: const Constant(0),
   );
   @override
-  late final GeneratedColumnWithTypeConverter<BookStatus, String> status =
-      GeneratedColumn<String>(
+  late final GeneratedColumnWithTypeConverter<BookStatus, int> status =
+      GeneratedColumn<int>(
         'status',
         aliasedName,
         false,
-        type: DriftSqlType.string,
+        type: DriftSqlType.int,
         requiredDuringInsert: true,
       ).withConverter<BookStatus>($BooksTable.$converterstatus);
   static const VerificationMeta _addedAtMeta = const VerificationMeta(
@@ -81,6 +77,17 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
   @override
   late final GeneratedColumn<DateTime> addedAt = GeneratedColumn<DateTime>(
     'added_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
     aliasedName,
     false,
     type: DriftSqlType.dateTime,
@@ -130,17 +137,6 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
-    'updatedAt',
-  );
-  @override
-  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
-    'updated_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -150,11 +146,11 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     currentPage,
     status,
     addedAt,
+    updatedAt,
     startedAt,
     finishedAt,
     coverPath,
     tagColor,
-    updatedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -208,6 +204,14 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     } else if (isInserting) {
       context.missing(_addedAtMeta);
     }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
     if (data.containsKey('started_at')) {
       context.handle(
         _startedAtMeta,
@@ -231,14 +235,6 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         _tagColorMeta,
         tagColor.isAcceptableOrUnknown(data['tag_color']!, _tagColorMeta),
       );
-    }
-    if (data.containsKey('updated_at')) {
-      context.handle(
-        _updatedAtMeta,
-        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_updatedAtMeta);
     }
     return context;
   }
@@ -271,13 +267,17 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
       )!,
       status: $BooksTable.$converterstatus.fromSql(
         attachedDatabase.typeMapping.read(
-          DriftSqlType.string,
+          DriftSqlType.int,
           data['${effectivePrefix}status'],
         )!,
       ),
       addedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}added_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
       )!,
       startedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
@@ -295,10 +295,6 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
         DriftSqlType.int,
         data['${effectivePrefix}tag_color'],
       ),
-      updatedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}updated_at'],
-      )!,
     );
   }
 
@@ -307,34 +303,23 @@ class $BooksTable extends Books with TableInfo<$BooksTable, Book> {
     return $BooksTable(attachedDatabase, alias);
   }
 
-  static JsonTypeConverter2<BookStatus, String, String> $converterstatus =
-      const EnumNameConverter<BookStatus>(BookStatus.values);
+  static JsonTypeConverter2<BookStatus, int, int> $converterstatus =
+      const EnumIndexConverter<BookStatus>(BookStatus.values);
 }
 
 class Book extends DataClass implements Insertable<Book> {
   final int id;
   final String title;
   final String? author;
-
-  /// Null when unknown (ebooks, audiobooks): no percentage is shown then.
   final int? totalPages;
   final int currentPage;
   final BookStatus status;
   final DateTime addedAt;
-  final DateTime? startedAt;
-
-  /// Drives 12 of 24 books in 2026.
-  final DateTime? finishedAt;
-
-  /// Photo picked from this device. Null shows a tag-colored placeholder.
-  final String? coverPath;
-
-  /// Index 0-3 into the reserved tag colors (burgundy, dusty blue, teal,
-  /// terracotta). Null = untagged.
-  final int? tagColor;
-
-  /// Last time the reader touched this book. Home shows the most recent one.
   final DateTime updatedAt;
+  final DateTime? startedAt;
+  final DateTime? finishedAt;
+  final String? coverPath;
+  final int? tagColor;
   const Book({
     required this.id,
     required this.title,
@@ -343,11 +328,11 @@ class Book extends DataClass implements Insertable<Book> {
     required this.currentPage,
     required this.status,
     required this.addedAt,
+    required this.updatedAt,
     this.startedAt,
     this.finishedAt,
     this.coverPath,
     this.tagColor,
-    required this.updatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -362,11 +347,10 @@ class Book extends DataClass implements Insertable<Book> {
     }
     map['current_page'] = Variable<int>(currentPage);
     {
-      map['status'] = Variable<String>(
-        $BooksTable.$converterstatus.toSql(status),
-      );
+      map['status'] = Variable<int>($BooksTable.$converterstatus.toSql(status));
     }
     map['added_at'] = Variable<DateTime>(addedAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     if (!nullToAbsent || startedAt != null) {
       map['started_at'] = Variable<DateTime>(startedAt);
     }
@@ -379,7 +363,6 @@ class Book extends DataClass implements Insertable<Book> {
     if (!nullToAbsent || tagColor != null) {
       map['tag_color'] = Variable<int>(tagColor);
     }
-    map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
 
@@ -396,6 +379,7 @@ class Book extends DataClass implements Insertable<Book> {
       currentPage: Value(currentPage),
       status: Value(status),
       addedAt: Value(addedAt),
+      updatedAt: Value(updatedAt),
       startedAt: startedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(startedAt),
@@ -408,7 +392,6 @@ class Book extends DataClass implements Insertable<Book> {
       tagColor: tagColor == null && nullToAbsent
           ? const Value.absent()
           : Value(tagColor),
-      updatedAt: Value(updatedAt),
     );
   }
 
@@ -424,14 +407,14 @@ class Book extends DataClass implements Insertable<Book> {
       totalPages: serializer.fromJson<int?>(json['totalPages']),
       currentPage: serializer.fromJson<int>(json['currentPage']),
       status: $BooksTable.$converterstatus.fromJson(
-        serializer.fromJson<String>(json['status']),
+        serializer.fromJson<int>(json['status']),
       ),
       addedAt: serializer.fromJson<DateTime>(json['addedAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       startedAt: serializer.fromJson<DateTime?>(json['startedAt']),
       finishedAt: serializer.fromJson<DateTime?>(json['finishedAt']),
       coverPath: serializer.fromJson<String?>(json['coverPath']),
       tagColor: serializer.fromJson<int?>(json['tagColor']),
-      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
   @override
@@ -443,15 +426,15 @@ class Book extends DataClass implements Insertable<Book> {
       'author': serializer.toJson<String?>(author),
       'totalPages': serializer.toJson<int?>(totalPages),
       'currentPage': serializer.toJson<int>(currentPage),
-      'status': serializer.toJson<String>(
+      'status': serializer.toJson<int>(
         $BooksTable.$converterstatus.toJson(status),
       ),
       'addedAt': serializer.toJson<DateTime>(addedAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'startedAt': serializer.toJson<DateTime?>(startedAt),
       'finishedAt': serializer.toJson<DateTime?>(finishedAt),
       'coverPath': serializer.toJson<String?>(coverPath),
       'tagColor': serializer.toJson<int?>(tagColor),
-      'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
 
@@ -463,11 +446,11 @@ class Book extends DataClass implements Insertable<Book> {
     int? currentPage,
     BookStatus? status,
     DateTime? addedAt,
+    DateTime? updatedAt,
     Value<DateTime?> startedAt = const Value.absent(),
     Value<DateTime?> finishedAt = const Value.absent(),
     Value<String?> coverPath = const Value.absent(),
     Value<int?> tagColor = const Value.absent(),
-    DateTime? updatedAt,
   }) => Book(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -476,11 +459,11 @@ class Book extends DataClass implements Insertable<Book> {
     currentPage: currentPage ?? this.currentPage,
     status: status ?? this.status,
     addedAt: addedAt ?? this.addedAt,
+    updatedAt: updatedAt ?? this.updatedAt,
     startedAt: startedAt.present ? startedAt.value : this.startedAt,
     finishedAt: finishedAt.present ? finishedAt.value : this.finishedAt,
     coverPath: coverPath.present ? coverPath.value : this.coverPath,
     tagColor: tagColor.present ? tagColor.value : this.tagColor,
-    updatedAt: updatedAt ?? this.updatedAt,
   );
   Book copyWithCompanion(BooksCompanion data) {
     return Book(
@@ -495,13 +478,13 @@ class Book extends DataClass implements Insertable<Book> {
           : this.currentPage,
       status: data.status.present ? data.status.value : this.status,
       addedAt: data.addedAt.present ? data.addedAt.value : this.addedAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
       finishedAt: data.finishedAt.present
           ? data.finishedAt.value
           : this.finishedAt,
       coverPath: data.coverPath.present ? data.coverPath.value : this.coverPath,
       tagColor: data.tagColor.present ? data.tagColor.value : this.tagColor,
-      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -515,11 +498,11 @@ class Book extends DataClass implements Insertable<Book> {
           ..write('currentPage: $currentPage, ')
           ..write('status: $status, ')
           ..write('addedAt: $addedAt, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('startedAt: $startedAt, ')
           ..write('finishedAt: $finishedAt, ')
           ..write('coverPath: $coverPath, ')
-          ..write('tagColor: $tagColor, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('tagColor: $tagColor')
           ..write(')'))
         .toString();
   }
@@ -533,11 +516,11 @@ class Book extends DataClass implements Insertable<Book> {
     currentPage,
     status,
     addedAt,
+    updatedAt,
     startedAt,
     finishedAt,
     coverPath,
     tagColor,
-    updatedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -550,11 +533,11 @@ class Book extends DataClass implements Insertable<Book> {
           other.currentPage == this.currentPage &&
           other.status == this.status &&
           other.addedAt == this.addedAt &&
+          other.updatedAt == this.updatedAt &&
           other.startedAt == this.startedAt &&
           other.finishedAt == this.finishedAt &&
           other.coverPath == this.coverPath &&
-          other.tagColor == this.tagColor &&
-          other.updatedAt == this.updatedAt);
+          other.tagColor == this.tagColor);
 }
 
 class BooksCompanion extends UpdateCompanion<Book> {
@@ -565,11 +548,11 @@ class BooksCompanion extends UpdateCompanion<Book> {
   final Value<int> currentPage;
   final Value<BookStatus> status;
   final Value<DateTime> addedAt;
+  final Value<DateTime> updatedAt;
   final Value<DateTime?> startedAt;
   final Value<DateTime?> finishedAt;
   final Value<String?> coverPath;
   final Value<int?> tagColor;
-  final Value<DateTime> updatedAt;
   const BooksCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -578,11 +561,11 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.currentPage = const Value.absent(),
     this.status = const Value.absent(),
     this.addedAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.startedAt = const Value.absent(),
     this.finishedAt = const Value.absent(),
     this.coverPath = const Value.absent(),
     this.tagColor = const Value.absent(),
-    this.updatedAt = const Value.absent(),
   });
   BooksCompanion.insert({
     this.id = const Value.absent(),
@@ -592,11 +575,11 @@ class BooksCompanion extends UpdateCompanion<Book> {
     this.currentPage = const Value.absent(),
     required BookStatus status,
     required DateTime addedAt,
+    required DateTime updatedAt,
     this.startedAt = const Value.absent(),
     this.finishedAt = const Value.absent(),
     this.coverPath = const Value.absent(),
     this.tagColor = const Value.absent(),
-    required DateTime updatedAt,
   }) : title = Value(title),
        status = Value(status),
        addedAt = Value(addedAt),
@@ -607,13 +590,13 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Expression<String>? author,
     Expression<int>? totalPages,
     Expression<int>? currentPage,
-    Expression<String>? status,
+    Expression<int>? status,
     Expression<DateTime>? addedAt,
+    Expression<DateTime>? updatedAt,
     Expression<DateTime>? startedAt,
     Expression<DateTime>? finishedAt,
     Expression<String>? coverPath,
     Expression<int>? tagColor,
-    Expression<DateTime>? updatedAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -623,11 +606,11 @@ class BooksCompanion extends UpdateCompanion<Book> {
       if (currentPage != null) 'current_page': currentPage,
       if (status != null) 'status': status,
       if (addedAt != null) 'added_at': addedAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (startedAt != null) 'started_at': startedAt,
       if (finishedAt != null) 'finished_at': finishedAt,
       if (coverPath != null) 'cover_path': coverPath,
       if (tagColor != null) 'tag_color': tagColor,
-      if (updatedAt != null) 'updated_at': updatedAt,
     });
   }
 
@@ -639,11 +622,11 @@ class BooksCompanion extends UpdateCompanion<Book> {
     Value<int>? currentPage,
     Value<BookStatus>? status,
     Value<DateTime>? addedAt,
+    Value<DateTime>? updatedAt,
     Value<DateTime?>? startedAt,
     Value<DateTime?>? finishedAt,
     Value<String?>? coverPath,
     Value<int?>? tagColor,
-    Value<DateTime>? updatedAt,
   }) {
     return BooksCompanion(
       id: id ?? this.id,
@@ -653,11 +636,11 @@ class BooksCompanion extends UpdateCompanion<Book> {
       currentPage: currentPage ?? this.currentPage,
       status: status ?? this.status,
       addedAt: addedAt ?? this.addedAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       startedAt: startedAt ?? this.startedAt,
       finishedAt: finishedAt ?? this.finishedAt,
       coverPath: coverPath ?? this.coverPath,
       tagColor: tagColor ?? this.tagColor,
-      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -680,12 +663,15 @@ class BooksCompanion extends UpdateCompanion<Book> {
       map['current_page'] = Variable<int>(currentPage.value);
     }
     if (status.present) {
-      map['status'] = Variable<String>(
+      map['status'] = Variable<int>(
         $BooksTable.$converterstatus.toSql(status.value),
       );
     }
     if (addedAt.present) {
       map['added_at'] = Variable<DateTime>(addedAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
     if (startedAt.present) {
       map['started_at'] = Variable<DateTime>(startedAt.value);
@@ -698,9 +684,6 @@ class BooksCompanion extends UpdateCompanion<Book> {
     }
     if (tagColor.present) {
       map['tag_color'] = Variable<int>(tagColor.value);
-    }
-    if (updatedAt.present) {
-      map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
     return map;
   }
@@ -715,11 +698,11 @@ class BooksCompanion extends UpdateCompanion<Book> {
           ..write('currentPage: $currentPage, ')
           ..write('status: $status, ')
           ..write('addedAt: $addedAt, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('startedAt: $startedAt, ')
           ..write('finishedAt: $finishedAt, ')
           ..write('coverPath: $coverPath, ')
-          ..write('tagColor: $tagColor, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('tagColor: $tagColor')
           ..write(')'))
         .toString();
   }
@@ -753,7 +736,7 @@ class $ProgressEntriesTable extends ProgressEntries
     type: DriftSqlType.int,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES books (id) ON DELETE CASCADE',
+      'REFERENCES books (id)',
     ),
   );
   static const VerificationMeta _pageMeta = const VerificationMeta('page');
@@ -883,12 +866,7 @@ class $ProgressEntriesTable extends ProgressEntries
 class ProgressEntry extends DataClass implements Insertable<ProgressEntry> {
   final int id;
   final int bookId;
-
-  /// The page the reader was on after this update.
   final int page;
-
-  /// Change since the previous update (negative if the reader corrected
-  /// backwards).
   final int pagesAdded;
   final DateTime loggedAt;
   const ProgressEntry({
@@ -1095,16 +1073,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [books, progressEntries];
-  @override
-  StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'books',
-        limitUpdateKind: UpdateKind.delete,
-      ),
-      result: [TableUpdate('progress_entries', kind: UpdateKind.delete)],
-    ),
-  ]);
 }
 
 typedef $$BooksTableCreateCompanionBuilder =
@@ -1116,11 +1084,11 @@ typedef $$BooksTableCreateCompanionBuilder =
       Value<int> currentPage,
       required BookStatus status,
       required DateTime addedAt,
+      required DateTime updatedAt,
       Value<DateTime?> startedAt,
       Value<DateTime?> finishedAt,
       Value<String?> coverPath,
       Value<int?> tagColor,
-      required DateTime updatedAt,
     });
 typedef $$BooksTableUpdateCompanionBuilder =
     BooksCompanion Function({
@@ -1131,11 +1099,11 @@ typedef $$BooksTableUpdateCompanionBuilder =
       Value<int> currentPage,
       Value<BookStatus> status,
       Value<DateTime> addedAt,
+      Value<DateTime> updatedAt,
       Value<DateTime?> startedAt,
       Value<DateTime?> finishedAt,
       Value<String?> coverPath,
       Value<int?> tagColor,
-      Value<DateTime> updatedAt,
     });
 
 final class $$BooksTableReferences
@@ -1196,7 +1164,7 @@ class $$BooksTableFilterComposer extends Composer<_$AppDatabase, $BooksTable> {
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnWithTypeConverterFilters<BookStatus, BookStatus, String> get status =>
+  ColumnWithTypeConverterFilters<BookStatus, BookStatus, int> get status =>
       $composableBuilder(
         column: $table.status,
         builder: (column) => ColumnWithTypeConverterFilters(column),
@@ -1204,6 +1172,11 @@ class $$BooksTableFilterComposer extends Composer<_$AppDatabase, $BooksTable> {
 
   ColumnFilters<DateTime> get addedAt => $composableBuilder(
     column: $table.addedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1224,11 +1197,6 @@ class $$BooksTableFilterComposer extends Composer<_$AppDatabase, $BooksTable> {
 
   ColumnFilters<int> get tagColor => $composableBuilder(
     column: $table.tagColor,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1292,13 +1260,18 @@ class $$BooksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get status => $composableBuilder(
+  ColumnOrderings<int> get status => $composableBuilder(
     column: $table.status,
     builder: (column) => ColumnOrderings(column),
   );
 
   ColumnOrderings<DateTime> get addedAt => $composableBuilder(
     column: $table.addedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -1319,11 +1292,6 @@ class $$BooksTableOrderingComposer
 
   ColumnOrderings<int> get tagColor => $composableBuilder(
     column: $table.tagColor,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
 }
@@ -1356,11 +1324,14 @@ class $$BooksTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumnWithTypeConverter<BookStatus, String> get status =>
+  GeneratedColumnWithTypeConverter<BookStatus, int> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
 
   GeneratedColumn<DateTime> get addedAt =>
       $composableBuilder(column: $table.addedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   GeneratedColumn<DateTime> get startedAt =>
       $composableBuilder(column: $table.startedAt, builder: (column) => column);
@@ -1375,9 +1346,6 @@ class $$BooksTableAnnotationComposer
 
   GeneratedColumn<int> get tagColor =>
       $composableBuilder(column: $table.tagColor, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get updatedAt =>
-      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   Expression<T> progressEntriesRefs<T extends Object>(
     Expression<T> Function($$ProgressEntriesTableAnnotationComposer a) f,
@@ -1440,11 +1408,11 @@ class $$BooksTableTableManager
                 Value<int> currentPage = const Value.absent(),
                 Value<BookStatus> status = const Value.absent(),
                 Value<DateTime> addedAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> startedAt = const Value.absent(),
                 Value<DateTime?> finishedAt = const Value.absent(),
                 Value<String?> coverPath = const Value.absent(),
                 Value<int?> tagColor = const Value.absent(),
-                Value<DateTime> updatedAt = const Value.absent(),
               }) => BooksCompanion(
                 id: id,
                 title: title,
@@ -1453,11 +1421,11 @@ class $$BooksTableTableManager
                 currentPage: currentPage,
                 status: status,
                 addedAt: addedAt,
+                updatedAt: updatedAt,
                 startedAt: startedAt,
                 finishedAt: finishedAt,
                 coverPath: coverPath,
                 tagColor: tagColor,
-                updatedAt: updatedAt,
               ),
           createCompanionCallback:
               ({
@@ -1468,11 +1436,11 @@ class $$BooksTableTableManager
                 Value<int> currentPage = const Value.absent(),
                 required BookStatus status,
                 required DateTime addedAt,
+                required DateTime updatedAt,
                 Value<DateTime?> startedAt = const Value.absent(),
                 Value<DateTime?> finishedAt = const Value.absent(),
                 Value<String?> coverPath = const Value.absent(),
                 Value<int?> tagColor = const Value.absent(),
-                required DateTime updatedAt,
               }) => BooksCompanion.insert(
                 id: id,
                 title: title,
@@ -1481,11 +1449,11 @@ class $$BooksTableTableManager
                 currentPage: currentPage,
                 status: status,
                 addedAt: addedAt,
+                updatedAt: updatedAt,
                 startedAt: startedAt,
                 finishedAt: finishedAt,
                 coverPath: coverPath,
                 tagColor: tagColor,
-                updatedAt: updatedAt,
               ),
           withReferenceMapper: (p0) => p0
               .map(

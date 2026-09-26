@@ -31,6 +31,7 @@ class ContinueReadingCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final total = book.totalPages;
     final fraction = book.progressFraction;
+    //debugPrint('currentPage=${book.currentPage} totalPages=${book.totalPages} fraction=$fraction');
     final author = book.author;
     final started = book.currentPage > 0;
 
