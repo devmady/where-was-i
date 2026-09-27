@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'core/app_info.dart';
 import 'core/state/theme_mode_store.dart';
 import 'core/theme/app_theme.dart';
 import 'shared/widgets/app_shell.dart';
@@ -14,6 +15,7 @@ void main() async {
   themeModeNotifier.addListener(() {
     ThemeModeStore.save(themeModeNotifier.value);
   });
+  await AppInfo.load();
   runApp(const WhereWasIApp());
 }
 

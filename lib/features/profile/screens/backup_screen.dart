@@ -1,4 +1,9 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_fonts.dart';
 import '../../../shared/widgets/coming_soon.dart';
@@ -9,13 +14,151 @@ import '../widgets/sub_screen_scaffold.dart';
 
 /// Back up, restore, export, and erase.
 ///
-/// Everything here is UI-only until the Drift layer exists.
-/// Pending: backup = serialize books + progress to one JSON file the
-/// reader saves wherever they like; restore = read that file back; CSV export
-/// = titles/authors/dates for spreadsheets. On a successful backup, set
+/// Backup and restore are wired to the real database (see
+/// BookRepository.exportBackupJson / importBackupJson). CSV export is
+/// still a separate, later item. On a successful backup, sets
 /// ProfileStore.lastBackup.
-class BackupScreen extends StatelessWidget {
+///
+/// Cover images are not part of the backup file. A restore brings back
+/// every book and all reading progress, but not the cover pictures
+/// themselves — the UI says this before a restore happens.
+class BackupScreen extends StatefulWidget {
   const BackupScreen({super.key});
+
+  @override
+  State<BackupScreen> createState() => _BackupScreenState();
+}
+
+class _BackupScreenState extends State<BackupScreen> {
+  bool _working = false;
+
+  Future<void> _createBackup() async {
+    if (_working) return;
+    setState(() => _working = true);
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final json = await BookRepository.instance.exportBackupJson();
+
+      final directory = await getTemporaryDirectory();
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+      final stamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+      final file = File('${directory.path}/where-was-i-backup-$stamp.json');
+      await file.writeAsString(json);
+
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          text: 'Where Was I? backup',
+        ),
+      );
+
+      ProfileStore.instance.lastBackup.value = DateTime.now();
+    } catch (error) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Could not create a backup: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<void> _restoreBackup() async {
+    if (_working) return;
+    final messenger = ScaffoldMessenger.of(context);
+
+    setState(() => _working = true);
+
+    try {
+      final files = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      final path = files.isEmpty ? null : files.first.path;
+      if (path == null) {
+        setState(() => _working = false);
+        return;
+      }
+
+      final json = await File(path).readAsString();
+      final preview = await BookRepository.instance.peekBackupJson(json);
+
+      if (!mounted) return;
+      final proceed = await _confirmRestore(context, preview);
+      if (proceed != true) {
+        setState(() => _working = false);
+        return;
+      }
+
+      await BookRepository.instance.importBackupJson(json);
+
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Backup restored.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on BackupFormatException catch (error) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Could not restore that backup: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<bool?> _confirmRestore(BuildContext context, BackupPreview preview) {
+    final colors = Theme.of(context).colorScheme;
+    final exportedAt = preview.exportedAt;
+    final whenText = exportedAt == null
+        ? ''
+        : ' made on ${MaterialLocalizations.of(context).formatShortMonthDay(exportedAt)}';
+    final bookWord = preview.bookCount == 1 ? 'book' : 'books';
+
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Restore from a backup?'),
+        content: Text(
+          'This backup$whenText has ${preview.bookCount} $bookWord. '
+          'Restoring replaces every book and all reading progress '
+          'currently in the app with what is in this file. Cover images '
+          "are not included in backups, so they won't come back with a "
+          'restore. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: colors.error),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,19 +172,13 @@ class BackupScreen extends StatelessWidget {
               icon: Icons.download_outlined,
               title: 'Create a backup',
               subtitle: 'Your books and progress, in one file',
-              onTap: () => showComingSoon(
-                context,
-                'Backups arrive with the database layer.',
-              ),
+              onTap: _working ? null : _createBackup,
             ),
             SettingsRow(
               icon: Icons.upload_outlined,
               title: 'Restore from a backup',
               subtitle: 'Replaces what is in the app right now',
-              onTap: () => showComingSoon(
-                context,
-                'Restore arrives with the database layer.',
-              ),
+              onTap: _working ? null : _restoreBackup,
             ),
             SettingsRow(
               icon: Icons.description_outlined,
@@ -49,7 +186,7 @@ class BackupScreen extends StatelessWidget {
               subtitle: 'Titles, authors and dates, as CSV',
               onTap: () => showComingSoon(
                 context,
-                'CSV export arrives with the database layer.',
+                'CSV export is coming in a later update.',
               ),
             ),
           ],
@@ -143,7 +280,8 @@ class _BackupStatus extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 'Your library lives only on this device, so a backup is '
-                'your safety copy.',
+                'your safety copy. Backup files do not include cover '
+                'images.',
                 style: textTheme.bodyLarge?.copyWith(
                   fontSize: 15,
                   height: 1.45,
