@@ -99,7 +99,7 @@ class AboutScreen extends StatelessWidget {
             ),
             SettingsRow(
               icon: Icons.flag_outlined,
-              title: 'Report a problem',
+              title: 'Report a issue on GitHub',
               subtitle: 'Opens the issue tracker',
               trailing: SettingsTrailing.external,
               onTap: () => _openLink(context, kIssuesUrl),
