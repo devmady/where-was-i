@@ -48,7 +48,7 @@ assets/
 .vscode/
 build/
 
-.metadata
-analysis_options.yaml
-pubspec.lock
-pubspec.yaml
+/.metadata
+/analysis_options.yaml
+/pubspec.lock
+/pubspec.yaml
