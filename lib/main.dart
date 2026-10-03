@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'core/app_info.dart';
 import 'core/state/theme_mode_store.dart';
 import 'core/theme/app_theme.dart';
+import 'shared/state/widget_sync.dart';
 import 'shared/widgets/app_shell.dart';
 
 /// Holds the current theme mode so it can be read and changed from
@@ -16,6 +17,7 @@ void main() async {
     ThemeModeStore.save(themeModeNotifier.value);
   });
   await AppInfo.load();
+  WidgetSync.start();
   runApp(const WhereWasIApp());
 }
 

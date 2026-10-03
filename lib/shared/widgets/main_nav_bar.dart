@@ -3,23 +3,29 @@ import 'package:flutter/material.dart';
 /// Floating rounded-pill nav bar: Library / Home / Profile, icon-only.
 /// The active icon is shown as a filled teal circle; inactive icons
 /// are plain outline icons in muted secondary text color.
+///
+/// Pressing and holding the Library or the Home icon opens the add-book
+/// sheet, so adding a book is one hold away from either screen.
 class MainNavBar extends StatelessWidget {
   const MainNavBar({
     super.key,
     required this.currentIndex,
     required this.onTap,
-    required this.onHomeLongPress,
+    required this.onAddBookLongPress,
   });
 
   final int currentIndex;
   final ValueChanged<int> onTap;
-  final VoidCallback onHomeLongPress;
+  final VoidCallback onAddBookLongPress;
 
   static const _icons = [
     Icons.menu_book_outlined, // Library
     Icons.home_outlined,      // Home
     Icons.person_outline,     // Profile
   ];
+
+  /// Library and Home both open the add-book sheet on a long press.
+  static const _addBookIndexes = {0, 1};
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +54,8 @@ class MainNavBar extends StatelessWidget {
                   icon: _icons[index],
                   selected: selected,
                   onTap: () => onTap(index),
-                  onLongPress: index == 1 ? onHomeLongPress : null,
+                  onLongPress:
+                      _addBookIndexes.contains(index) ? onAddBookLongPress : null,
                 ),
               );
             }),

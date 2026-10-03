@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ww_widget_bg">#F4F1EC</color>
+    <color name="ww_on_surface">#1A1A1A</color>
+    <color name="ww_muted">#6B6B6B</color>
+    <color name="ww_primary">#0F6E56</color>
+    <color name="ww_on_primary">#FFFFFF</color>
+    <color name="ww_track">#DDD7CC</color>
+    <color name="ww_btn">#E6E1D8</color>
+    <color name="ww_cover">#3D5A73</color>
+</resources>
