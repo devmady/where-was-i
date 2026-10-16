@@ -85,9 +85,9 @@ class _AppShellState extends State<AppShell> {
 
   void _openAddBookSheet() {
     // Opens the shared add-book sheet. The plus button in the Library header,
-    // the long press on the Library and Home icons, and the widget plus
-    // button all open the very same sheet, so the entry points never drift
-    // into different flows.
+    // the long press on the Home icon, and the widget plus button all open
+    // the very same sheet, so the entry points never drift into different
+    // flows.
     showAddBookSheet(context);
   }
 

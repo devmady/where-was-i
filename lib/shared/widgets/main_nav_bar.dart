@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 /// The active icon is shown as a filled teal circle; inactive icons
 /// are plain outline icons in muted secondary text color.
 ///
-/// Pressing and holding the Library or the Home icon opens the add-book
-/// sheet, so adding a book is one hold away from either screen.
+/// Pressing and holding the Home icon opens the add-book sheet. The Library
+/// icon only navigates; adding a book there is done with the plus button
+/// in the Library header.
 class MainNavBar extends StatelessWidget {
   const MainNavBar({
     super.key,
@@ -24,8 +25,8 @@ class MainNavBar extends StatelessWidget {
     Icons.person_outline,     // Profile
   ];
 
-  /// Library and Home both open the add-book sheet on a long press.
-  static const _addBookIndexes = {0, 1};
+  /// Only Home opens the add-book sheet on a long press.
+  static const _addBookIndexes = {1};
 
   @override
   Widget build(BuildContext context) {

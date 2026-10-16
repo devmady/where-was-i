@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:home_widget/home_widget.dart';
 
 import '../../../core/database/app_database.dart' show Book;
 import '../../../core/database/tables.dart' show BookStatus;
@@ -16,7 +18,8 @@ import 'book_detail_screen.dart';
 enum _LibraryFilter { all, reading, wantToRead, finished }
 
 /// Library screen, left of the Home center. Every book as a cover grid, with
-/// filters by status, a simple search, and the add button in the header.
+/// filters by status, a simple search, and the search, add widget and add
+/// book buttons in the header.
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
 
@@ -39,6 +42,40 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   _LibraryFilter _filter = _LibraryFilter.all;
   bool _searching = false;
+  bool _canPinWidget = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkWidgetPinSupport();
+  }
+
+  /// Only Android has the widget so far, and pinning needs Android 8 or newer
+  /// plus a launcher that allows it. The button stays hidden otherwise.
+  Future<void> _checkWidgetPinSupport() async {
+    if (defaultTargetPlatform != TargetPlatform.android) return;
+    try {
+      final supported = await HomeWidget.isRequestPinWidgetSupported();
+      if (!mounted || supported != true) return;
+      setState(() => _canPinWidget = true);
+    } catch (error) {
+      debugPrint('LibraryScreen: could not check widget pin support ($error)');
+    }
+  }
+
+  /// Asks Android to add the Where Was I widget to the home screen. The
+  /// system shows its own confirmation, so nothing more is needed here.
+  Future<void> _requestWidgetPin() async {
+    try {
+      await HomeWidget.requestPinWidget(
+        name: 'WhereWasIWidgetProvider',
+        androidName: 'WhereWasIWidgetProvider',
+        qualifiedAndroidName: 'com.mady.wherewasi.WhereWasIWidgetProvider',
+      );
+    } catch (error) {
+      debugPrint('LibraryScreen: could not request widget pin ($error)');
+    }
+  }
 
   @override
   void dispose() {
@@ -152,6 +189,19 @@ class _LibraryScreenState extends State<LibraryScreen> {
             foregroundColor: colors.onSurface,
           ),
         ),
+        if (_canPinWidget) ...[
+          const SizedBox(width: 10),
+          IconButton.outlined(
+            tooltip: 'Add widget to home screen',
+            onPressed: _requestWidgetPin,
+            icon: const Icon(Icons.widgets_outlined, size: 20),
+            style: IconButton.styleFrom(
+              fixedSize: const Size(40, 40),
+              side: BorderSide(color: colors.outline),
+              foregroundColor: colors.onSurface,
+            ),
+          ),
+        ],
         const SizedBox(width: 10),
         IconButton.filled(
           tooltip: 'Add a book',
