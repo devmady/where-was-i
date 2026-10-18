@@ -14,6 +14,9 @@ import 'main_nav_bar.dart';
 /// Uses a Stack so the floating pill nav bar overlaps page content
 /// at the bottom, rather than pushing it up like a standard
 /// BottomAppBar would.
+///
+/// The nav bar reads the page controller directly, so swiping never has to
+/// rebuild this shell.
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
@@ -26,7 +29,12 @@ class _AppShellState extends State<AppShell> {
 
   final PageController _pageController = PageController(initialPage: _homeIndex);
   StreamSubscription<Uri?>? _widgetTaps;
-  int _currentIndex = _homeIndex;
+
+  /// The page the strip is on or closest to right now.
+  int get _currentIndex {
+    if (!_pageController.hasClients) return _homeIndex;
+    return _pageController.page?.round() ?? _homeIndex;
+  }
 
   @override
   void initState() {
@@ -71,16 +79,12 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _onNavTap(int index) {
-    setState(() => _currentIndex = index);
+    if (!_pageController.hasClients) return;
     _pageController.animateToPage(
       index,
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeInOut,
     );
-  }
-
-  void _onPageChanged(int index) {
-    setState(() => _currentIndex = index);
   }
 
   void _openAddBookSheet() {
@@ -99,17 +103,16 @@ class _AppShellState extends State<AppShell> {
         children: [
           PageView(
             controller: _pageController,
-            onPageChanged: _onPageChanged,
-            children: [
-              const LibraryScreen(),
-              const HomeScreen(),
-              const ProfileScreen(),
+            children: const [
+              LibraryScreen(),
+              HomeScreen(),
+              ProfileScreen(),
             ],
           ),
           Align(
             alignment: Alignment.bottomCenter,
             child: MainNavBar(
-              currentIndex: _currentIndex,
+              pageController: _pageController,
               onTap: _onNavTap,
               onAddBookLongPress: _openAddBookSheet,
             ),
