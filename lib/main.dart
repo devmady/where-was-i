@@ -17,7 +17,7 @@ void main() async {
     ThemeModeStore.save(themeModeNotifier.value);
   });
   await AppInfo.load();
-  WidgetSync.start();
+  WidgetSync.start(themeMode: themeModeNotifier);
   runApp(const WhereWasIApp());
 }
 
