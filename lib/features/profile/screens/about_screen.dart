@@ -44,19 +44,12 @@ class AboutScreen extends StatelessWidget {
           padding: const EdgeInsets.only(top: 8),
           child: Column(
             children: [
-              // Pending: replace with the real launcher icon once it exists.
-              Container(
+              Image.asset(
+                'assets/images/app_logo.png',
                 width: 88,
                 height: 88,
-                decoration: BoxDecoration(
-                  color: colors.primary,
-                  borderRadius: BorderRadius.circular(26),
-                ),
-                child: Icon(
-                  Icons.bookmark_border,
-                  size: 44,
-                  color: colors.onPrimary,
-                ),
+                filterQuality: FilterQuality.high,
+                semanticLabel: kAppName,
               ),
               const SizedBox(height: 16),
               Text(
@@ -119,3 +112,4 @@ class AboutScreen extends StatelessWidget {
     );
   }
 }
+
