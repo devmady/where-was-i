@@ -211,29 +211,17 @@ class _BackupScreenState extends State<BackupScreen> {
     );
   }
 
+  /// Erasing takes two steps. First a warning that says what will be lost and
+  /// when the last backup was. Then a five second countdown that can be
+  /// stopped at any moment. Only a countdown that runs all the way down erases.
   Future<void> _confirmErase(BuildContext context) async {
-    final colors = Theme.of(context).colorScheme;
+    final proceed = await _showEraseWarning(context);
+    if (proceed != true || !context.mounted) return;
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Erase all data?'),
-        content: const Text(
-          'This deletes every book and all reading progress from this '
-          'device. It cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: colors.error),
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Erase everything'),
-          ),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (_) => const _EraseCountdownDialog(),
     );
 
     if (confirmed != true || !context.mounted) return;
@@ -244,6 +232,180 @@ class _BackupScreenState extends State<BackupScreen> {
         content: Text('All books and progress erased.'),
         behavior: SnackBarBehavior.floating,
       ),
+    );
+  }
+
+  Future<bool?> _showEraseWarning(BuildContext context) async {
+    int? count;
+    try {
+      count = (await BookRepository.instance.watchAll().first).length;
+    } catch (_) {
+      count = null;
+    }
+    if (!context.mounted) return null;
+
+    final colors = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final lastBackup = ProfileStore.instance.lastBackup.value;
+    final booksText = switch (count) {
+      null || 0 => 'every book',
+      1 => '1 book',
+      _ => '$count books',
+    };
+    final backupText = lastBackup == null
+        ? 'You have never made a backup.'
+        : 'Your last backup was ${MaterialLocalizations.of(context).formatShortMonthDay(lastBackup)}.';
+
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(Icons.warning_amber_rounded, size: 40, color: colors.error),
+        title: const Text('Erase all data?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This permanently deletes $booksText and all your reading '
+              'progress from this device. There is no way to get it back.',
+            ),
+            const SizedBox(height: 12),
+            Text(
+              backupText,
+              style: textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: colors.error,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: colors.error),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Continue'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The last step before erasing. A ring empties over five seconds with the
+/// seconds left in the middle. Stop, the back button, or leaving the app all
+/// cancel it. Closing with true, which erases, happens only when the ring has
+/// emptied completely.
+class _EraseCountdownDialog extends StatefulWidget {
+  const _EraseCountdownDialog();
+
+  @override
+  State<_EraseCountdownDialog> createState() => _EraseCountdownDialogState();
+}
+
+class _EraseCountdownDialogState extends State<_EraseCountdownDialog>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  static const int _seconds = 5;
+
+  late final AnimationController _controller;
+  bool _closed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: _seconds),
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed) _close(true);
+      });
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// Leaving the app mid countdown cancels it, so the timer can never finish
+  /// while the reader is not looking at the screen.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) _close(false);
+  }
+
+  void _close(bool erase) {
+    if (_closed || !mounted) return;
+    _closed = true;
+    _controller.stop();
+    Navigator.of(context).pop(erase);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return AlertDialog(
+      icon: Icon(Icons.warning_amber_rounded, size: 40, color: colors.error),
+      title: const Text('Erasing everything'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              final left = (_seconds * (1 - _controller.value))
+                  .ceil()
+                  .clamp(0, _seconds);
+              return SizedBox(
+                width: 104,
+                height: 104,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox.expand(
+                      child: CircularProgressIndicator(
+                        value: 1 - _controller.value,
+                        strokeWidth: 8,
+                        color: colors.error,
+                        backgroundColor: colors.errorContainer,
+                      ),
+                    ),
+                    Text(
+                      '$left',
+                      style: AppFonts.serifStyle(
+                        size: 40,
+                        height: 1.2,
+                        color: colors.error,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Your books and progress will be deleted when the timer ends. '
+            'Tap Stop to keep them.',
+            textAlign: TextAlign.center,
+            style: textTheme.bodyMedium,
+          ),
+        ],
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => _close(false),
+          child: const Text('Stop, keep my data'),
+        ),
+      ],
     );
   }
 }

@@ -29,6 +29,15 @@
                 <action android:name="es.antonborri.home_widget.action.LAUNCH" />
             </intent-filter>
         </activity>
+        <!-- The small card over the home screen that updates the page of a book. -->
+        <activity
+            android:name=".WidgetProgressActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@style/WWProgressDialogTheme"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
         <!-- The Where Was I home screen widget. -->
         <receiver
             android:name=".WhereWasIWidgetProvider"

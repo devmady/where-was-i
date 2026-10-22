@@ -95,9 +95,13 @@ class BookRepository {
   /// Records I'm on page page now: logs a progress entry and moves the
   /// book forward. A book that was only wanted becomes reading.
   ///
+  /// at is when the page was reached. It is only given for a page set from the
+  /// home screen widget, which is saved later than it happened. It defaults
+  /// to now.
+  ///
   /// Reaching the last page does not finish the book by itself; the UI can
   /// offer that (see markFinished).
-  Future<void> updatePage(int bookId, int page) {
+  Future<void> updatePage(int bookId, int page, {DateTime? at}) {
     return _db.transaction(() async {
       final book = await (_db.select(_db.books)
             ..where((b) => b.id.equals(bookId)))
@@ -109,7 +113,7 @@ class BookRepository {
       if (total != null && next > total) next = total;
       if (next == book.currentPage) return;
 
-      final now = DateTime.now();
+      final now = at ?? DateTime.now();
       final startsNow = book.status == BookStatus.wantToRead;
 
       await _db.into(_db.progressEntries).insert(

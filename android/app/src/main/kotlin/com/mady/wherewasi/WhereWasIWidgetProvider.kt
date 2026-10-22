@@ -38,7 +38,7 @@ import kotlin.math.roundToInt
  * theme, and the same values live in the color resources that the widget uses
  * while the app is set to follow the phone.
  */
-private class WidgetPalette(
+internal class WidgetPalette(
     val background: Int,
     val onSurface: Int,
     val muted: Int,
@@ -48,7 +48,7 @@ private class WidgetPalette(
     val button: Int,
 )
 
-private val LIGHT_PALETTE = WidgetPalette(
+internal val LIGHT_PALETTE = WidgetPalette(
     background = 0xFFF4F1EC.toInt(),
     onSurface = 0xFF1A1A1A.toInt(),
     muted = 0xFF6B6B6B.toInt(),
@@ -58,7 +58,7 @@ private val LIGHT_PALETTE = WidgetPalette(
     button = 0xFFE6E1D8.toInt(),
 )
 
-private val DARK_PALETTE = WidgetPalette(
+internal val DARK_PALETTE = WidgetPalette(
     background = 0xFF212725.toInt(),
     onSurface = 0xFFF2F2F0.toInt(),
     muted = 0xFF9A9A97.toInt(),
@@ -76,6 +76,11 @@ private val COVER_PLACEHOLDER_COLOR = 0xFF3D5A73.toInt()
  * that is being read, most recently touched first, and wrap around at the
  * ends. Which book is showing is remembered here by book id, so the widget
  * does not jump back to the top after the arrows are used.
+ *
+ * The plus button depends on the library. With no book being read it opens the
+ * app to add one. With a book being read it opens a small card over the home
+ * screen, see WidgetProgressActivity, to update the page without opening the
+ * app.
  *
  * The list of books comes from the Flutter app, which writes it as json each
  * time the library changes. Everything stays on the device.
@@ -243,7 +248,7 @@ class WhereWasIWidgetProvider : HomeWidgetProvider() {
 
         forcedPalette(prefs)?.let { applyPalette(views, it, size) }
 
-        bindClicks(context, views)
+        bindClicks(context, views, book)
         manager.updateAppWidget(widgetId, views)
     }
 
@@ -472,7 +477,7 @@ class WhereWasIWidgetProvider : HomeWidgetProvider() {
         views.setViewVisibility(R.id.ww_cover_image, View.VISIBLE)
     }
 
-    private fun bindClicks(context: Context, views: RemoteViews) {
+    private fun bindClicks(context: Context, views: RemoteViews, book: WidgetBook?) {
         views.setOnClickPendingIntent(
             R.id.ww_root,
             HomeWidgetLaunchIntent.getActivity(
@@ -481,14 +486,20 @@ class WhereWasIWidgetProvider : HomeWidgetProvider() {
                 Uri.parse(OPEN_URI),
             ),
         )
-        views.setOnClickPendingIntent(
-            R.id.ww_btn_add,
-            HomeWidgetLaunchIntent.getActivity(
-                context,
-                MainActivity::class.java,
-                Uri.parse(ADD_BOOK_URI),
-            ),
-        )
+        if (book == null) {
+            views.setContentDescription(R.id.ww_btn_add, "Add a book")
+            views.setOnClickPendingIntent(
+                R.id.ww_btn_add,
+                HomeWidgetLaunchIntent.getActivity(
+                    context,
+                    MainActivity::class.java,
+                    Uri.parse(ADD_BOOK_URI),
+                ),
+            )
+        } else {
+            views.setContentDescription(R.id.ww_btn_add, "Update the page you are on")
+            views.setOnClickPendingIntent(R.id.ww_btn_add, progressCard(context, book.id))
+        }
         views.setOnClickPendingIntent(
             R.id.ww_btn_prev,
             broadcast(context, ACTION_PREVIOUS, 1),
@@ -496,6 +507,20 @@ class WhereWasIWidgetProvider : HomeWidgetProvider() {
         views.setOnClickPendingIntent(
             R.id.ww_btn_next,
             broadcast(context, ACTION_NEXT, 2),
+        )
+    }
+
+    /** Opens the small card that updates the page of the book with this id. */
+    private fun progressCard(context: Context, bookId: Long): PendingIntent {
+        val intent = Intent(context, WidgetProgressActivity::class.java).apply {
+            putExtra(WidgetProgressActivity.EXTRA_BOOK_ID, bookId)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return PendingIntent.getActivity(
+            context,
+            3,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
 
@@ -601,9 +626,9 @@ class WhereWasIWidgetProvider : HomeWidgetProvider() {
         const val ACTION_PREVIOUS = "com.mady.wherewasi.widget.PREVIOUS"
         const val ACTION_NEXT = "com.mady.wherewasi.widget.NEXT"
 
-        const val KEY_BOOKS = "books_json"
-        const val KEY_CURRENT_BOOK = "widget_current_book_id"
-        const val KEY_THEME_MODE = "widget_theme_mode"
+        const val KEY_BOOKS = WidgetStorage.KEY_BOOKS
+        const val KEY_CURRENT_BOOK = WidgetStorage.KEY_CURRENT_BOOK
+        const val KEY_THEME_MODE = WidgetStorage.KEY_THEME_MODE
 
         const val OPEN_URI = "wherewasi://open"
         const val ADD_BOOK_URI = "wherewasi://add-book"
