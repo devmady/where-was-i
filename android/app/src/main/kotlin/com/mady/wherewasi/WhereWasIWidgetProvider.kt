@@ -234,6 +234,13 @@ class WhereWasIWidgetProvider : HomeWidgetProvider() {
         val progress = ((book?.fraction ?: 0f) * 1000).roundToInt()
         views.setProgressBar(R.id.ww_progress, 1000, progress, false)
 
+        // The arrows have nowhere to go with one book or none, so they are
+        // dimmed. The alpha is set both ways so they light up again as soon
+        // as a second book is being read.
+        val arrowAlpha = if (books.size > 1) 1f else ARROW_DIMMED_ALPHA
+        views.setFloat(R.id.ww_btn_prev, "setAlpha", arrowAlpha)
+        views.setFloat(R.id.ww_btn_next, "setAlpha", arrowAlpha)
+
         forcedPalette(prefs)?.let { applyPalette(views, it, size) }
 
         bindClicks(context, views)
@@ -603,6 +610,9 @@ class WhereWasIWidgetProvider : HomeWidgetProvider() {
 
         // Used until the launcher reports a real size.
         const val DEFAULT_DP = 160f
+
+        // How faint the arrow buttons look when there is only one book or none.
+        const val ARROW_DIMMED_ALPHA = 0.35f
 
         // Narrower than this uses the narrow layout. Wider and shorter than
         // the large height uses the wide layout, and wider and taller uses
