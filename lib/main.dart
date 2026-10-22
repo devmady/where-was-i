@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'core/app_info.dart';
 import 'core/state/theme_mode_store.dart';
+import 'core/state/widget_theme_store.dart';
 import 'core/theme/app_theme.dart';
 import 'shared/state/widget_sync.dart';
 import 'shared/widgets/app_shell.dart';
@@ -10,14 +11,25 @@ import 'shared/widgets/app_shell.dart';
 /// state management package. Defaults to following the OS setting.
 final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier(ThemeMode.system);
 
+/// The theme chosen for the home screen widget. System means the widget
+/// follows the app theme above, Light or Dark fixes it to that look.
+final ValueNotifier<ThemeMode> widgetThemeNotifier = ValueNotifier(ThemeMode.system);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   themeModeNotifier.value = await ThemeModeStore.load();
   themeModeNotifier.addListener(() {
     ThemeModeStore.save(themeModeNotifier.value);
   });
+  widgetThemeNotifier.value = await WidgetThemeStore.load();
+  widgetThemeNotifier.addListener(() {
+    WidgetThemeStore.save(widgetThemeNotifier.value);
+  });
   await AppInfo.load();
-  WidgetSync.start(themeMode: themeModeNotifier);
+  WidgetSync.start(
+    themeMode: themeModeNotifier,
+    widgetThemeMode: widgetThemeNotifier,
+  );
   runApp(const WhereWasIApp());
 }
 

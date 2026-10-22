@@ -25,10 +25,16 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
+  static const _libraryIndex = 0;
   static const _homeIndex = 1;
 
   final PageController _pageController = PageController(initialPage: _homeIndex);
   StreamSubscription<Uri?>? _widgetTaps;
+
+  /// True while the Library search bar is open. The Library sets it when the
+  /// search opens or closes. Setting it to false from here asks the Library
+  /// to close its search, which is what the back button does first.
+  final ValueNotifier<bool> _librarySearchOpen = ValueNotifier<bool>(false);
 
   /// The page the strip is on or closest to right now.
   int get _currentIndex {
@@ -46,6 +52,7 @@ class _AppShellState extends State<AppShell> {
   void dispose() {
     _widgetTaps?.cancel();
     _pageController.dispose();
+    _librarySearchOpen.dispose();
     super.dispose();
   }
 
@@ -87,6 +94,18 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+  /// The back button while nothing is open on top of the three screens. On
+  /// Home the system closes the app, so this is only reached on Library or
+  /// Profile. An open Library search closes first, then back goes to Home.
+  /// Sheets, dialogs and pushed screens close on their own before this runs.
+  void _handleBack() {
+    if (_currentIndex == _libraryIndex && _librarySearchOpen.value) {
+      _librarySearchOpen.value = false;
+      return;
+    }
+    if (_currentIndex != _homeIndex) _onNavTap(_homeIndex);
+  }
+
   void _openAddBookSheet() {
     // Opens the shared add-book sheet. The plus button in the Library header,
     // the long press on the Home icon, and the widget plus button all open
@@ -97,28 +116,43 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          PageView(
-            controller: _pageController,
-            children: const [
-              LibraryScreen(),
-              HomeScreen(),
-              ProfileScreen(),
-            ],
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: MainNavBar(
-              pageController: _pageController,
-              onTap: _onNavTap,
-              onAddBookLongPress: _openAddBookSheet,
+    // Only the back handling rebuilds while the strip moves. The screens and
+    // the nav bar are built once and passed through as the child.
+    return AnimatedBuilder(
+      animation: _pageController,
+      child: Scaffold(
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            PageView(
+              controller: _pageController,
+              children: [
+                LibraryScreen(searchOpen: _librarySearchOpen),
+                const HomeScreen(),
+                const ProfileScreen(),
+              ],
             ),
-          ),
-        ],
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: MainNavBar(
+                pageController: _pageController,
+                onTap: _onNavTap,
+                onAddBookLongPress: _openAddBookSheet,
+              ),
+            ),
+          ],
+        ),
       ),
+      builder: (context, scaffold) {
+        return PopScope(
+          canPop: _currentIndex == _homeIndex,
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) return;
+            _handleBack();
+          },
+          child: scaffold!,
+        );
+      },
     );
   }
 }

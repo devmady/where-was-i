@@ -2,17 +2,44 @@ import 'package:flutter/material.dart';
 
 import '../../../main.dart' show themeModeNotifier;
 
-/// System / Light / Dark as a one-tap segmented control, wired to the
-/// app-wide themeModeNotifier so changes apply instantly everywhere.
+/// System / Light / Dark as a one-tap segmented control. By default it is
+/// wired to the app-wide themeModeNotifier so changes apply instantly
+/// everywhere. Another notifier and another name for the first choice can be
+/// given, which the widget theme setting uses.
 class ThemeModeControl extends StatelessWidget {
-  const ThemeModeControl({super.key});
+  const ThemeModeControl({
+    super.key,
+    this.notifier,
+    this.systemLabel = 'System',
+  });
+
+  final ValueNotifier<ThemeMode>? notifier;
+  final String systemLabel;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final target = notifier ?? themeModeNotifier;
+    final options = [
+      (
+        mode: ThemeMode.system,
+        label: systemLabel,
+        icon: Icons.brightness_auto_outlined,
+      ),
+      (
+        mode: ThemeMode.light,
+        label: 'Light',
+        icon: Icons.light_mode_outlined,
+      ),
+      (
+        mode: ThemeMode.dark,
+        label: 'Dark',
+        icon: Icons.dark_mode_outlined,
+      ),
+    ];
 
     return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeModeNotifier,
+      valueListenable: target,
       builder: (context, mode, _) {
         return Container(
           padding: const EdgeInsets.all(4),
@@ -22,13 +49,13 @@ class ThemeModeControl extends StatelessWidget {
           ),
           child: Row(
             children: [
-              for (final option in _options)
+              for (final option in options)
                 Expanded(
                   child: _Segment(
                     icon: option.icon,
                     label: option.label,
                     selected: mode == option.mode,
-                    onTap: () => themeModeNotifier.value = option.mode,
+                    onTap: () => target.value = option.mode,
                   ),
                 ),
             ],
@@ -37,24 +64,6 @@ class ThemeModeControl extends StatelessWidget {
       },
     );
   }
-
-  static const _options = [
-    (
-      mode: ThemeMode.system,
-      label: 'System',
-      icon: Icons.brightness_auto_outlined,
-    ),
-    (
-      mode: ThemeMode.light,
-      label: 'Light',
-      icon: Icons.light_mode_outlined,
-    ),
-    (
-      mode: ThemeMode.dark,
-      label: 'Dark',
-      icon: Icons.dark_mode_outlined,
-    ),
-  ];
 }
 
 class _Segment extends StatelessWidget {

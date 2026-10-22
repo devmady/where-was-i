@@ -15,7 +15,9 @@ import '../../features/library/state/book_repository.dart';
 /// storage the widget reads from, and the widget is asked to redraw. The list
 /// keeps the order of watchAll, most recently touched first. The theme mode
 /// chosen in the app, system, light or dark, is written the same way, so the
-/// widget can match the app instead of only the phone. Which book the widget
+/// widget can match the app instead of only the phone. A separate widget theme
+/// can override it, so the widget can be fixed to light or dark whatever the
+/// app is set to. Which book the widget
 /// is showing is remembered by the widget itself, so its arrows keep working
 /// when the app is closed. Nothing leaves the device.
 class WidgetSync {
@@ -29,7 +31,10 @@ class WidgetSync {
 
   /// Starts listening. Safe to call more than once. Does nothing on platforms
   /// that do not have the widget yet.
-  static void start({required ValueListenable<ThemeMode> themeMode}) {
+  static void start({
+    required ValueListenable<ThemeMode> themeMode,
+    required ValueListenable<ThemeMode> widgetThemeMode,
+  }) {
     if (_subscription != null) return;
     if (defaultTargetPlatform != TargetPlatform.android) return;
 
@@ -39,8 +44,17 @@ class WidgetSync {
           debugPrint('WidgetSync: could not read books ($error)'),
     );
 
-    unawaited(_pushTheme(themeMode.value));
-    themeMode.addListener(() => unawaited(_pushTheme(themeMode.value)));
+    // The widget theme wins unless it is set to system, which means follow the
+    // app theme.
+    void pushTheme() {
+      final widgetMode = widgetThemeMode.value;
+      final mode = widgetMode == ThemeMode.system ? themeMode.value : widgetMode;
+      unawaited(_pushTheme(mode));
+    }
+
+    pushTheme();
+    themeMode.addListener(pushTheme);
+    widgetThemeMode.addListener(pushTheme);
   }
 
   static Future<void> _push(List<Book> books) async {

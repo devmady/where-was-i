@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../../core/app_info.dart';
 import '../../../core/theme/app_fonts.dart';
+import '../../../main.dart' show widgetThemeNotifier;
 import '../../../shared/widgets/content_column.dart';
 import '../models/reminder_settings.dart';
 import '../models/user_profile.dart';
@@ -61,6 +64,15 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 28),
+              if (defaultTargetPlatform == TargetPlatform.android) ...[
+                const SettingsSection(
+                  label: 'Widget',
+                  footnote:
+                      'Choose how the home screen widget looks. Same as app follows Appearance above.',
+                  child: SettingsGroup(children: [_WidgetThemeRow()]),
+                ),
+                const SizedBox(height: 28),
+              ],
               SettingsSection(
                 label: 'Your data',
                 footnote:
@@ -208,6 +220,43 @@ class _AppearanceRow extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           const ThemeModeControl(),
+        ],
+      ),
+    );
+  }
+}
+
+class _WidgetThemeRow extends StatelessWidget {
+  const _WidgetThemeRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.widgets_outlined, size: 22, color: colors.onSurfaceVariant),
+              const SizedBox(width: 16),
+              Text(
+                'Theme',
+                style: textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: colors.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ThemeModeControl(
+            notifier: widgetThemeNotifier,
+            systemLabel: 'Same as app',
+          ),
         ],
       ),
     );

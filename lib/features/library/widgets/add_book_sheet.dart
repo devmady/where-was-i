@@ -39,6 +39,13 @@ class _AddBookSheet extends StatefulWidget {
 }
 
 class _AddBookSheetState extends State<_AddBookSheet> {
+  // How long to wait before the keyboard comes up. The sheet takes about a
+  // quarter of a second to slide in, so this leaves a calm pause after it has
+  // settled instead of the keyboard rising while the sheet is still moving.
+  static const Duration _keyboardDelay = Duration(milliseconds: 500);
+
+  final FocusNode _titleFocus = FocusNode();
+
   late final TextEditingController _title;
   late final TextEditingController _author;
   late final TextEditingController _total;
@@ -71,10 +78,34 @@ class _AddBookSheetState extends State<_AddBookSheet> {
     _tag = book?.tagColor;
     _coverPath = book?.coverPath;
     _originalCoverPath = book?.coverPath;
+    if (!_editing) _openKeyboardLater();
+  }
+
+  /// Brings up the keyboard on the title field a moment after the sheet has
+  /// settled. It is skipped for a first time reader with an empty library, who
+  /// gets the keyboard only by tapping a field, and when a field already has
+  /// focus because the reader tapped one first.
+  Future<void> _openKeyboardLater() async {
+    try {
+      final books = await BookRepository.instance.watchAll().first;
+      if (books.isEmpty) return;
+      await Future<void>.delayed(_keyboardDelay);
+      if (!mounted) return;
+      final focused = FocusManager.instance.primaryFocus?.context;
+      if (focused != null &&
+          focused.mounted &&
+          focused.findAncestorWidgetOfExactType<EditableText>() != null) {
+        return;
+      }
+      _titleFocus.requestFocus();
+    } catch (error) {
+      debugPrint('AddBookSheet: could not open the keyboard ($error)');
+    }
   }
 
   @override
   void dispose() {
+    _titleFocus.dispose();
     _title.dispose();
     _author.dispose();
     _total.dispose();
@@ -222,7 +253,7 @@ class _AddBookSheetState extends State<_AddBookSheet> {
             const SizedBox(height: 20),
             TextField(
               controller: _title,
-              autofocus: !_editing,
+              focusNode: _titleFocus,
               maxLength: 200,
               textCapitalization: TextCapitalization.words,
               textInputAction: TextInputAction.next,

@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:home_widget/home_widget.dart';
 
 import '../../../core/database/app_database.dart' show Book;
 import '../../../core/database/tables.dart' show BookStatus;
 import '../../../core/theme/app_fonts.dart';
+import '../../../main.dart' show widgetThemeNotifier;
 import '../../../shared/widgets/content_column.dart';
 import '../../../shared/widgets/field_decoration.dart';
 import '../state/book_repository.dart';
@@ -21,7 +24,12 @@ enum _LibraryFilter { all, reading, wantToRead, finished }
 /// filters by status, a simple search, and the search, add widget and add
 /// book buttons in the header.
 class LibraryScreen extends StatefulWidget {
-  const LibraryScreen({super.key});
+  const LibraryScreen({super.key, required this.searchOpen});
+
+  /// Tells the app shell whether the search bar is open, so the back button
+  /// can close the search first. The shell sets it to false to ask the
+  /// Library to close its search.
+  final ValueNotifier<bool> searchOpen;
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
@@ -29,6 +37,13 @@ class LibraryScreen extends StatefulWidget {
 
 class _LibraryScreenState extends State<LibraryScreen> {
   static const double _navClearance = 112;
+
+  // How long to wait after the search opens before the keyboard comes up, so
+  // the keyboard never competes with the header change.
+  static const Duration _keyboardDelay = Duration(milliseconds: 300);
+
+  // How long the add widget button must be held to switch the widget theme.
+  static const Duration _widgetThemeHold = Duration(seconds: 3);
 
   static const Map<_LibraryFilter, String> _labels = {
     _LibraryFilter.all: 'All',
@@ -39,15 +54,34 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   final Stream<List<Book>> _books = BookRepository.instance.watchAll();
   final TextEditingController _query = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
 
   _LibraryFilter _filter = _LibraryFilter.all;
   bool _searching = false;
+  int _bookCount = 0;
   bool _canPinWidget = false;
+  Timer? _widgetHoldTimer;
+  Offset? _widgetHoldStart;
 
   @override
   void initState() {
     super.initState();
+    // A new Library always starts with the search closed. This runs before
+    // the listener is added, so nothing is notified.
+    widget.searchOpen.value = false;
+    widget.searchOpen.addListener(_onSearchFlagChanged);
     _checkWidgetPinSupport();
+  }
+
+  /// The shell sets the flag to false when the back button should close the
+  /// search. When the search closes by its own button the state is already
+  /// closed, so nothing happens here.
+  void _onSearchFlagChanged() {
+    if (widget.searchOpen.value || !_searching) return;
+    setState(() {
+      _query.clear();
+      _searching = false;
+    });
   }
 
   /// Only Android has the widget so far, and pinning needs Android 8 or newer
@@ -79,8 +113,71 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   @override
   void dispose() {
+    widget.searchOpen.removeListener(_onSearchFlagChanged);
+    _widgetHoldTimer?.cancel();
     _query.dispose();
+    _searchFocus.dispose();
     super.dispose();
+  }
+
+  void _startWidgetHold(PointerDownEvent event) {
+    _widgetHoldStart = event.position;
+    _widgetHoldTimer?.cancel();
+    _widgetHoldTimer = Timer(_widgetThemeHold, _switchWidgetTheme);
+  }
+
+  /// Letting the finger wander off the button cancels the hold.
+  void _moveWidgetHold(PointerMoveEvent event) {
+    final start = _widgetHoldStart;
+    if (start == null) return;
+    if ((event.position - start).distance > 24) _cancelWidgetHold();
+  }
+
+  void _cancelWidgetHold() {
+    _widgetHoldTimer?.cancel();
+    _widgetHoldTimer = null;
+    _widgetHoldStart = null;
+  }
+
+  /// Switches the widget between light and dark after the three second hold,
+  /// and says which one it is now. When the widget follows the app, the look it
+  /// has right now is the one that gets switched.
+  void _switchWidgetTheme() {
+    _widgetHoldTimer = null;
+    _widgetHoldStart = null;
+    if (!mounted) return;
+
+    final current = switch (widgetThemeNotifier.value) {
+      ThemeMode.light => Brightness.light,
+      ThemeMode.dark => Brightness.dark,
+      ThemeMode.system => Theme.of(context).brightness,
+    };
+    final next = current == Brightness.dark ? ThemeMode.light : ThemeMode.dark;
+    widgetThemeNotifier.value = next;
+    HapticFeedback.mediumImpact();
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          'Widget theme changed to ${next == ThemeMode.dark ? 'dark' : 'light'}',
+        ),
+      ),
+    );
+  }
+
+  /// Opens the search bar. A reader who already has books gets the keyboard a
+  /// moment later, once the bar is in place. A first time reader with an empty
+  /// library does not get the keyboard until they tap the field.
+  void _openSearch() {
+    setState(() => _searching = true);
+    widget.searchOpen.value = true;
+    if (_bookCount == 0) return;
+    Future<void>.delayed(_keyboardDelay, () {
+      if (!mounted || !_searching) return;
+      _searchFocus.requestFocus();
+    });
   }
 
   List<Book> _apply(List<Book> all) {
@@ -122,6 +219,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             stream: _books,
             builder: (context, snapshot) {
               final all = snapshot.data ?? const <Book>[];
+              _bookCount = all.length;
               final visible = _apply(all);
 
               return CustomScrollView(
@@ -181,7 +279,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         ),
         IconButton.outlined(
           tooltip: 'Search',
-          onPressed: () => setState(() => _searching = true),
+          onPressed: _openSearch,
           icon: const Icon(Icons.search, size: 20),
           style: IconButton.styleFrom(
             fixedSize: const Size(40, 40),
@@ -191,14 +289,21 @@ class _LibraryScreenState extends State<LibraryScreen> {
         ),
         if (_canPinWidget) ...[
           const SizedBox(width: 10),
-          IconButton.outlined(
-            tooltip: 'Add widget to home screen',
-            onPressed: _requestWidgetPin,
-            icon: const Icon(Icons.widgets_outlined, size: 20),
-            style: IconButton.styleFrom(
-              fixedSize: const Size(40, 40),
-              side: BorderSide(color: colors.outline),
-              foregroundColor: colors.onSurface,
+          Listener(
+            onPointerDown: _startWidgetHold,
+            onPointerMove: _moveWidgetHold,
+            onPointerUp: (_) => _cancelWidgetHold(),
+            onPointerCancel: (_) => _cancelWidgetHold(),
+            child: IconButton.outlined(
+              tooltip:
+                  'Add widget to home screen. Hold for 3 seconds to switch the widget theme.',
+              onPressed: _requestWidgetPin,
+              icon: const Icon(Icons.widgets_outlined, size: 20),
+              style: IconButton.styleFrom(
+                fixedSize: const Size(40, 40),
+                side: BorderSide(color: colors.outline),
+                foregroundColor: colors.onSurface,
+              ),
             ),
           ),
         ],
@@ -221,7 +326,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         Expanded(
           child: TextField(
             controller: _query,
-            autofocus: true,
+            focusNode: _searchFocus,
             textInputAction: TextInputAction.search,
             onChanged: (_) => setState(() {}),
             decoration: appFieldDecoration(
@@ -233,10 +338,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
         const SizedBox(width: 10),
         IconButton.outlined(
           tooltip: 'Close search',
-          onPressed: () => setState(() {
-            _query.clear();
-            _searching = false;
-          }),
+          onPressed: () {
+            setState(() {
+              _query.clear();
+              _searching = false;
+            });
+            widget.searchOpen.value = false;
+          },
           icon: const Icon(Icons.close, size: 20),
           style: IconButton.styleFrom(
             fixedSize: const Size(40, 40),
