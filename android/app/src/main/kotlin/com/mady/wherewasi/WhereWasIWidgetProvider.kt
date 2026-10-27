@@ -500,12 +500,15 @@ class WhereWasIWidgetProvider : HomeWidgetProvider() {
             views.setContentDescription(R.id.ww_btn_add, "Update the page you are on")
             views.setOnClickPendingIntent(R.id.ww_btn_add, progressCard(context, book.id))
         }
+        // The arrows are tapped through the larger areas around them, which sit
+        // edge to edge with no gap, so a tap near an arrow never falls through
+        // to the widget body and opens the app.
         views.setOnClickPendingIntent(
-            R.id.ww_btn_prev,
+            R.id.ww_btn_prev_area,
             broadcast(context, ACTION_PREVIOUS, 1),
         )
         views.setOnClickPendingIntent(
-            R.id.ww_btn_next,
+            R.id.ww_btn_next_area,
             broadcast(context, ACTION_NEXT, 2),
         )
     }
@@ -647,13 +650,13 @@ class WhereWasIWidgetProvider : HomeWidgetProvider() {
 
         // Narrow layout. The fixed height is the padding, the progress bar and
         // the bottom row. The cover is only shown when there is room beside it.
-        const val SMALL_FIXED_DP = 55f
+        const val SMALL_FIXED_DP = 59f
         const val SMALL_COVER_MIN_WIDTH_DP = 150f
         const val SMALL_AUTHOR_MIN_HEIGHT_DP = 135f
 
         // Wide layout. This is everything in the width except the cover and
         // the title column, plus a title column that is still readable.
-        const val MEDIUM_OTHER_WIDTH_DP = 162f
+        const val MEDIUM_OTHER_WIDTH_DP = 170f
 
         // Large layout. The fixed height is the padding, the progress bar, the
         // info row and the bottom row.

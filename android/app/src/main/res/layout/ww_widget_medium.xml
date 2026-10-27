@@ -6,13 +6,18 @@
     android:background="@drawable/ww_widget_bg"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:padding="12dp">
+    android:paddingStart="12dp"
+    android:paddingTop="0dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="0dp">
 
     <ImageView
         android:id="@+id/ww_cover_image"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
         android:layout_marginEnd="12dp"
+        android:layout_marginBottom="12dp"
         android:contentDescription="Book cover"
         android:scaleType="fitCenter"
         android:visibility="gone" />
@@ -20,7 +25,9 @@
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="match_parent"
+        android:layout_marginTop="12dp"
         android:layout_marginEnd="10dp"
+        android:layout_marginBottom="12dp"
         android:layout_weight="1"
         android:orientation="vertical">
 
@@ -91,7 +98,7 @@
     </LinearLayout>
 
     <LinearLayout
-        android:layout_width="26dp"
+        android:layout_width="34dp"
         android:layout_height="match_parent"
         android:orientation="vertical">
 
@@ -99,6 +106,8 @@
             android:id="@+id/ww_btn_add"
             android:layout_width="26dp"
             android:layout_height="26dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginTop="12dp"
             android:background="@drawable/ww_btn_primary"
             android:contentDescription="Add a book"
             android:gravity="center"
@@ -109,33 +118,46 @@
             android:textStyle="bold" />
 
         <FrameLayout
+            android:id="@+id/ww_btn_prev_area"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:contentDescription="Previous book">
 
-        <TextView
-            android:id="@+id/ww_btn_prev"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:background="@drawable/ww_btn_neutral"
-            android:contentDescription="Previous book"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:text="&#8593;"
-            android:textColor="@color/ww_muted"
-            android:textSize="13sp" />
+            <TextView
+                android:id="@+id/ww_btn_prev"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center"
+                android:background="@drawable/ww_btn_neutral"
+                android:gravity="center"
+                android:importantForAccessibility="no"
+                android:includeFontPadding="false"
+                android:text="&#8593;"
+                android:textColor="@color/ww_muted"
+                android:textSize="13sp" />
+        </FrameLayout>
 
-        <TextView
-            android:id="@+id/ww_btn_next"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:layout_marginTop="6dp"
-            android:background="@drawable/ww_btn_neutral"
+        <FrameLayout
+            android:id="@+id/ww_btn_next_area"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:contentDescription="Next book"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:text="&#8595;"
-            android:textColor="@color/ww_muted"
-            android:textSize="13sp" />
+            android:paddingBottom="12dp">
+
+            <TextView
+                android:id="@+id/ww_btn_next"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center"
+                android:background="@drawable/ww_btn_neutral"
+                android:gravity="center"
+                android:importantForAccessibility="no"
+                android:includeFontPadding="false"
+                android:text="&#8595;"
+                android:textColor="@color/ww_muted"
+                android:textSize="13sp" />
+        </FrameLayout>
     </LinearLayout>
 </LinearLayout>

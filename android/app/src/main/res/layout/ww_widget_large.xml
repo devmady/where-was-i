@@ -5,7 +5,10 @@
     android:layout_height="match_parent"
     android:background="@drawable/ww_widget_bg"
     android:orientation="vertical"
-    android:padding="14dp">
+    android:paddingStart="14dp"
+    android:paddingTop="14dp"
+    android:paddingEnd="14dp"
+    android:paddingBottom="0dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -145,40 +148,57 @@
 
     <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="36dp"
-        android:layout_marginTop="10dp">
+        android:layout_height="54dp"
+        android:layout_marginTop="6dp">
 
         <LinearLayout
             android:id="@+id/ww_arrows"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_alignParentEnd="true"
             android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/ww_btn_prev"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="@drawable/ww_btn_neutral"
+            <FrameLayout
+                android:id="@+id/ww_btn_prev_area"
+                android:layout_width="40dp"
+                android:layout_height="match_parent"
                 android:contentDescription="Previous book"
-                android:gravity="center"
-                android:includeFontPadding="false"
-                android:text="&#8593;"
-                android:textColor="@color/ww_on_surface"
-                android:textSize="16sp" />
+                android:paddingBottom="14dp">
 
-            <TextView
-                android:id="@+id/ww_btn_next"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_marginStart="8dp"
-                android:background="@drawable/ww_btn_neutral"
+                <TextView
+                    android:id="@+id/ww_btn_prev"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/ww_btn_neutral"
+                    android:gravity="center"
+                    android:importantForAccessibility="no"
+                    android:includeFontPadding="false"
+                    android:text="&#8593;"
+                    android:textColor="@color/ww_on_surface"
+                    android:textSize="16sp" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/ww_btn_next_area"
+                android:layout_width="40dp"
+                android:layout_height="match_parent"
                 android:contentDescription="Next book"
-                android:gravity="center"
-                android:includeFontPadding="false"
-                android:text="&#8595;"
-                android:textColor="@color/ww_on_surface"
-                android:textSize="16sp" />
+                android:paddingBottom="14dp">
+
+                <TextView
+                    android:id="@+id/ww_btn_next"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/ww_btn_neutral"
+                    android:gravity="center"
+                    android:importantForAccessibility="no"
+                    android:includeFontPadding="false"
+                    android:text="&#8595;"
+                    android:textColor="@color/ww_on_surface"
+                    android:textSize="16sp" />
+            </FrameLayout>
         </LinearLayout>
 
         <TextView
@@ -188,6 +208,7 @@
             android:layout_alignParentStart="true"
             android:layout_centerVertical="true"
             android:layout_marginEnd="8dp"
+            android:layout_marginBottom="14dp"
             android:layout_toStartOf="@id/ww_arrows"
             android:ellipsize="end"
             android:fontFamily="sans-serif-medium"

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' show Random;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -75,7 +76,12 @@ class _AddBookSheetState extends State<_AddBookSheet> {
     _author = TextEditingController(text: book?.author ?? '');
     _total = TextEditingController(text: book?.totalPages?.toString() ?? '');
     _current = TextEditingController();
-    _tag = book?.tagColor;
+    // A new book starts with a random color from the default tag colors, so
+    // covers do not all look the same. The reader can pick another color or
+    // choose No color. Editing keeps the color the book already has.
+    _tag = book != null
+        ? book.tagColor
+        : Random().nextInt(AppTagColors.all.length);
     _coverPath = book?.coverPath;
     _originalCoverPath = book?.coverPath;
     if (!_editing) _openKeyboardLater();
@@ -229,15 +235,9 @@ class _AddBookSheetState extends State<_AddBookSheet> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    return SafeArea(
-      top: false,
+    return _KeyboardRiser(
       child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          4,
-          20,
-          20 + MediaQuery.viewInsetsOf(context).bottom,
-        ),
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -489,6 +489,89 @@ class _AddBookSheetState extends State<_AddBookSheet> {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Keeps the space under the sheet equal to the keyboard, or to the system
+/// navigation area when no keyboard is showing, and moves that space in one
+/// even motion. Some phones report the keyboard height in a single jump
+/// instead of following the keyboard as it rises. A jump that big is smoothed
+/// here with an ease out curve about as long as the keyboard motion itself,
+/// so the card rises together with the keyboard instead of snapping. Small
+/// steps mean the system is already animating, so they are followed directly
+/// and the card never lags behind the keyboard.
+class _KeyboardRiser extends StatefulWidget {
+  const _KeyboardRiser({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_KeyboardRiser> createState() => _KeyboardRiserState();
+}
+
+class _KeyboardRiserState extends State<_KeyboardRiser>
+    with SingleTickerProviderStateMixin {
+  static const Duration _duration = Duration(milliseconds: 280);
+  static const double _jump = 120;
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: _duration,
+  );
+
+  bool _seeded = false;
+  double _from = 0;
+  double _target = 0;
+
+  double get _shown {
+    if (!_controller.isAnimating) return _target;
+    final progress = Curves.easeOutCubic.transform(_controller.value);
+    return _from + (_target - _from) * progress;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    final system = MediaQuery.viewPaddingOf(context).bottom;
+    final space = keyboard > system ? keyboard : system;
+
+    if (!_seeded) {
+      _seeded = true;
+      _from = space;
+      _target = space;
+      return;
+    }
+    if (space == _target) return;
+
+    final shown = _shown;
+    if (_controller.isAnimating || (space - shown).abs() > _jump) {
+      _from = shown;
+      _target = space;
+      _controller.forward(from: 0);
+    } else {
+      _target = space;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      child: widget.child,
+      builder: (context, child) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: _shown),
+          child: child,
+        );
+      },
     );
   }
 }

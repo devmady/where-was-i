@@ -68,7 +68,7 @@ class ProfileScreen extends StatelessWidget {
                 const SettingsSection(
                   label: 'Widget',
                   footnote:
-                      'Choose how the home screen widget looks. Same as app follows Appearance above.',
+                      'Choose how the home screen widget looks. App follows Appearance above.',
                   child: SettingsGroup(children: [_WidgetThemeRow()]),
                 ),
                 const SizedBox(height: 28),
@@ -83,7 +83,7 @@ class ProfileScreen extends StatelessWidget {
                       valueListenable: store.lastBackup,
                       builder: (context, last, _) => SettingsRow(
                         icon: Icons.download_outlined,
-                        title: 'Back up & export',
+                        title: 'Data & backup',
                         subtitle: last == null
                             ? 'Last backup: never'
                             : 'Last backup: ${MaterialLocalizations.of(context).formatShortMonthDay(last)}',
@@ -255,7 +255,7 @@ class _WidgetThemeRow extends StatelessWidget {
           const SizedBox(height: 14),
           ThemeModeControl(
             notifier: widgetThemeNotifier,
-            systemLabel: 'Same as app',
+            systemLabel: 'App',
           ),
         ],
       ),

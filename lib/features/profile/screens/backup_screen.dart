@@ -163,7 +163,7 @@ class _BackupScreenState extends State<BackupScreen> {
   @override
   Widget build(BuildContext context) {
     return SubScreenScaffold(
-      title: 'Back up & export',
+      title: 'Data & backup',
       children: [
         const _BackupStatus(),
         SettingsGroup(
@@ -211,9 +211,10 @@ class _BackupScreenState extends State<BackupScreen> {
     );
   }
 
-  /// Erasing takes two steps. First a warning that says what will be lost and
-  /// when the last backup was. Then a five second countdown that can be
-  /// stopped at any moment. Only a countdown that runs all the way down erases.
+  /// Erasing takes three steps. First a warning that says what will be lost
+  /// and when the last backup was. Then a five second countdown that can be
+  /// stopped at any moment. When the countdown has run all the way down, a
+  /// final confirmation asks once more. Only a tap on its erase button erases.
   Future<void> _confirmErase(BuildContext context) async {
     final proceed = await _showEraseWarning(context);
     if (proceed != true || !context.mounted) return;
@@ -295,10 +296,13 @@ class _BackupScreenState extends State<BackupScreen> {
   }
 }
 
-/// The last step before erasing. A ring empties over five seconds with the
-/// seconds left in the middle. Stop, the back button, or leaving the app all
-/// cancel it. Closing with true, which erases, happens only when the ring has
-/// emptied completely.
+/// The last two steps before erasing, shown in the same dialog. First a ring
+/// empties over five seconds with the seconds left in the middle. Stop, the
+/// back button, or leaving the app all cancel it. When the ring has emptied
+/// completely nothing is erased yet. The dialog switches to a final
+/// confirmation, and only a tap on its erase button closes with true, which
+/// erases. Keep my data sits where Stop was, so a late tap on Stop can never
+/// erase.
 class _EraseCountdownDialog extends StatefulWidget {
   const _EraseCountdownDialog();
 
@@ -312,6 +316,7 @@ class _EraseCountdownDialogState extends State<_EraseCountdownDialog>
 
   late final AnimationController _controller;
   bool _closed = false;
+  bool _finished = false;
 
   @override
   void initState() {
@@ -321,7 +326,7 @@ class _EraseCountdownDialogState extends State<_EraseCountdownDialog>
       vsync: this,
       duration: const Duration(seconds: _seconds),
     )..addStatusListener((status) {
-        if (status == AnimationStatus.completed) _close(true);
+        if (status == AnimationStatus.completed) _finish();
       });
     _controller.forward();
   }
@@ -334,10 +339,19 @@ class _EraseCountdownDialogState extends State<_EraseCountdownDialog>
   }
 
   /// Leaving the app mid countdown cancels it, so the timer can never finish
-  /// while the reader is not looking at the screen.
+  /// while the reader is not looking at the screen. Once the countdown is over
+  /// the final confirmation simply waits, because nothing is erased without a
+  /// tap on it.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_finished) return;
     if (state != AppLifecycleState.resumed) _close(false);
+  }
+
+  /// The countdown reached zero. Moves on to the final confirmation.
+  void _finish() {
+    if (_closed || _finished || !mounted) return;
+    setState(() => _finished = true);
   }
 
   void _close(bool erase) {
@@ -347,8 +361,50 @@ class _EraseCountdownDialogState extends State<_EraseCountdownDialog>
     Navigator.of(context).pop(erase);
   }
 
+  Widget _buildFinalConfirmation(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return AlertDialog(
+      icon: Icon(Icons.delete_forever_outlined, size: 40, color: colors.error),
+      title: const Text('Erase everything now?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'The timer has ended and nothing has been erased yet. Tap Erase '
+            'everything to permanently delete all your books and reading '
+            'progress from this device.',
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'This cannot be undone.',
+            style: textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: colors.error,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          style: TextButton.styleFrom(foregroundColor: colors.error),
+          onPressed: () => _close(true),
+          child: const Text('Erase everything'),
+        ),
+        FilledButton(
+          onPressed: () => _close(false),
+          child: const Text('Keep my data'),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_finished) return _buildFinalConfirmation(context);
+
     final colors = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
