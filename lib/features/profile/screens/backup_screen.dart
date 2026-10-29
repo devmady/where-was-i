@@ -388,12 +388,15 @@ class _EraseCountdownDialogState extends State<_EraseCountdownDialog>
         ],
       ),
       actions: [
-        TextButton(
-          style: TextButton.styleFrom(foregroundColor: colors.error),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: colors.error,
+            foregroundColor: colors.onError,
+          ),
           onPressed: () => _close(true),
           child: const Text('Erase everything'),
         ),
-        FilledButton(
+        TextButton(
           onPressed: () => _close(false),
           child: const Text('Keep my data'),
         ),

@@ -1,7 +1,8 @@
 import 'dart:io';
-import 'dart:math' show Random;
+import 'dart:math' show Random, exp;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter/services.dart';
 
 import '../../../core/database/app_database.dart' show Book;
@@ -494,13 +495,13 @@ class _AddBookSheetState extends State<_AddBookSheet> {
 }
 
 /// Keeps the space under the sheet equal to the keyboard, or to the system
-/// navigation area when no keyboard is showing, and moves that space in one
-/// even motion. Some phones report the keyboard height in a single jump
-/// instead of following the keyboard as it rises. A jump that big is smoothed
-/// here with an ease out curve about as long as the keyboard motion itself,
-/// so the card rises together with the keyboard instead of snapping. Small
-/// steps mean the system is already animating, so they are followed directly
-/// and the card never lags behind the keyboard.
+/// navigation area when no keyboard is showing. The shown space follows the
+/// reported keyboard height in one continuous glide that is never restarted.
+/// Each frame it covers a fixed share of the distance still left, so a phone
+/// that reports the keyboard height in one big jump gets a soft ease out, and
+/// a phone that reports small steps while the keyboard rises is followed
+/// closely with almost no trailing. The card therefore rises and falls
+/// together with the keyboard in both cases.
 class _KeyboardRiser extends StatefulWidget {
   const _KeyboardRiser({required this.child});
 
@@ -512,23 +513,20 @@ class _KeyboardRiser extends StatefulWidget {
 
 class _KeyboardRiserState extends State<_KeyboardRiser>
     with SingleTickerProviderStateMixin {
-  static const Duration _duration = Duration(milliseconds: 280);
-  static const double _jump = 120;
+  // Time constant of the glide in seconds. Smaller follows the keyboard more
+  // tightly, larger feels softer.
+  static const double _tau = 0.06;
+  // Distance in logical pixels under which the glide snaps to the target.
+  static const double _settle = 1;
+  // Longest frame gap counted, so one dropped frame never makes a big leap.
+  static const double _maxFrameGap = 0.05;
 
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: _duration,
-  );
+  late final Ticker _ticker = createTicker(_onTick);
+  final ValueNotifier<double> _space = ValueNotifier<double>(0);
 
   bool _seeded = false;
-  double _from = 0;
   double _target = 0;
-
-  double get _shown {
-    if (!_controller.isAnimating) return _target;
-    final progress = Curves.easeOutCubic.transform(_controller.value);
-    return _from + (_target - _from) * progress;
-  }
+  Duration _last = Duration.zero;
 
   @override
   void didChangeDependencies() {
@@ -539,36 +537,49 @@ class _KeyboardRiserState extends State<_KeyboardRiser>
 
     if (!_seeded) {
       _seeded = true;
-      _from = space;
       _target = space;
+      _space.value = space;
       return;
     }
     if (space == _target) return;
 
-    final shown = _shown;
-    if (_controller.isAnimating || (space - shown).abs() > _jump) {
-      _from = shown;
-      _target = space;
-      _controller.forward(from: 0);
-    } else {
-      _target = space;
+    _target = space;
+    if (!_ticker.isActive) {
+      _last = Duration.zero;
+      _ticker.start();
     }
+  }
+
+  void _onTick(Duration elapsed) {
+    var gap = (elapsed - _last).inMicroseconds / 1000000;
+    _last = elapsed;
+    if (gap > _maxFrameGap) gap = _maxFrameGap;
+
+    final remaining = _target - _space.value;
+    if (remaining.abs() <= _settle) {
+      _space.value = _target;
+      _ticker.stop();
+      return;
+    }
+    final share = 1 - exp(-gap / _tau);
+    _space.value = _space.value + remaining * share;
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _ticker.dispose();
+    _space.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      child: widget.child,
-      builder: (context, child) {
+    return ValueListenableBuilder<double>(
+      valueListenable: _space,
+      child: RepaintBoundary(child: widget.child),
+      builder: (context, space, child) {
         return Padding(
-          padding: EdgeInsets.only(bottom: _shown),
+          padding: EdgeInsets.only(bottom: space),
           child: child,
         );
       },
